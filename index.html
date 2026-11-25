@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>钢铁潮汐 · STEEL TIDE</title>
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#08131d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40"><path d="M20 3 33 14v12L20 37 7 26V14Z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M20 9v22M12 16h16M13 24h14" stroke="currentColor" stroke-width="1"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>钢铁潮汐</h1>
+        <p>STEEL TIDE <span>·</span> 1944</p>
+      </div>
+    </div>
+    <div class="status-strip" id="statusStrip"></div>
+    <div class="top-actions">
+      <button class="icon-btn mobile-only" id="btnMobileInfo" title="战报与舰队">战报</button>
+      <button class="icon-btn" id="btnRules" title="规则手册">规则</button>
+      <button class="icon-btn" id="btnSound" title="音效">音效 开</button>
+      <button class="icon-btn" id="btnRestart" title="重新开始">重开</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel side left" id="fleetPanel"></aside>
+    <section class="center">
+      <div class="phase-banner" id="phaseBanner"></div>
+      <div class="board-shell">
+        <div class="board-head" id="boardHead"></div>
+        <div class="board" id="board"></div>
+        <svg class="path-layer" id="pathLayer"></svg>
+      </div>
+      <div class="action-bar" id="actionBar"></div>
+    </section>
+    <aside class="panel side right">
+      <div class="panel-title"><span>战报</span><span class="log-count" id="logCount"></span></div>
+      <div class="log" id="log"></div>
+    </aside>
+  </main>
+
+  <footer class="hand-dock">
+    <div class="hand-head">
+      <span id="handTitle">手牌</span>
+      <span class="hand-hint" id="handHint"></span>
+    </div>
+    <div class="hand" id="hand"></div>
+  </footer>
+
+  <div id="tooltip" class="tooltip"></div>
+  <div id="overlay" class="overlay"></div>
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast"></div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "钢铁潮汐 · STEEL TIDE",
+  "short_name": "钢铁潮汐",
+  "description": "二战海战卡牌对战：6×5 战场、四向射界、主副炮、起火进水、航母空袭与自由牌组。",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050a10",
+  "theme_color": "#08131d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
