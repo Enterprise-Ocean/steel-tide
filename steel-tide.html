@@ -6,7 +6,7 @@
 <title>钢铁潮汐 · STEEL TIDE</title>
 
 
-<meta name="theme-color" content="#08131d"><meta name="description" content="钢铁潮汐 · STEEL TIDE 单文件网页版">
+<meta name="theme-color" content="#08131d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
@@ -1359,6 +1359,23 @@ button { font-family: inherit; }
   .info-log { max-height: 32vh; }
 }
 
+/* 双击舰船介绍 */
+.ship-info-panel {
+  width: min(520px, 92vw); max-height: 86vh; overflow-y: auto;
+  padding: 24px 26px 20px;
+  border: 1px solid rgba(200, 166, 106, 0.4);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(18, 33, 48, 0.99), rgba(7, 14, 22, 0.99));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+}
+.ship-info-title { font-family: var(--serif); font-size: 28px; color: var(--gold-2); letter-spacing: 0.08em; margin: 6px 0 2px; }
+.ship-info-sub { font-size: 9px; color: var(--muted); letter-spacing: 0.08em; margin-bottom: 12px; }
+.ship-info-panel .tt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; font-size: 10.5px; }
+.ship-info-panel .tt-grid span { color: var(--muted); }
+.ship-info-panel .tt-grid b { color: var(--ink); font-weight: 500; }
+.ship-info-desc { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 9.5px; line-height: 1.7; color: var(--muted); }
+.ship-info-panel .end-actions { margin-top: 14px; }
+
 </style>
 </head>
 <body>
@@ -1788,6 +1805,16 @@ button { font-family: inherit; }
     hull: '呂号潜水艦', torpedo: 5, move: 2, flavor: '中型潜艇。'
   });
 
+  /* ---------- 舰种速度 / 反潜统一调整 ---------- */
+  Object.values(SHIP_DEFS).forEach(d => {
+    if (d.cls === 'DD') {
+      d.move = 2;
+      d.asw = Math.max(d.asw, 6);
+    }
+    if (d.cls === 'CVE') d.asw = Math.max(d.asw, 4);
+    if (d.cls === 'SS') d.move = 1;
+  });
+
   /* ---------- 指令卡 ---------- */
   function cmd(id, name, nation, target, effect, value, desc, extra) {
     return {
@@ -1849,7 +1876,7 @@ button { font-family: inherit; }
 
     /* 扩展指令 */
     us_cmd_firebomb: cmd('us_cmd_firebomb', '燃烧弹', 'US', 'enemy', 'ignite', 2, '对一艘敌方水面舰造成 2 层起火。'),
-    uk_cmd_asw: cmd('uk_cmd_asw', '刺猬弹', 'UK', 'enemy', 'aswStrike', 3, '对一艘敌方潜艇造成 3 点伤害；若未沉没则暴露。'),
+    uk_cmd_asw: cmd('uk_cmd_asw', '刺猬弹', 'UK', 'enemy', 'aswStrike', 5, '对一艘敌方潜艇造成 5 点深弹伤害；若未沉没则暴露。'),
     fr_cmd_sabotage: cmd('fr_cmd_sabotage', '抵抗组织', 'FRA', 'none', 'supplyDrain', 1, '敌方补给 -1（不低于 0）。'),
     su_cmd_scorch: cmd('su_cmd_scorch', '焦土政策', 'USSR', 'enemy', 'ignite', 1, '对一艘敌方水面舰造成 1 层起火。'),
     it_cmd_maiali: cmd('it_cmd_maiali', '猪猡艇', 'ITA', 'enemy', 'floodHit', 1, '对一艘敌方水面舰造成 1 个进水。'),
@@ -1993,6 +2020,7 @@ button { font-family: inherit; }
     allowedNations, nationAllowed, deckStats, validateDeck, cardPoolForSide, cloneDeck
   };
 });
+
 
 
 
@@ -2238,7 +2266,7 @@ button { font-family: inherit; }
     const dotSunk = applyStartOfTurnDamage(state, side);
     if (state.finished) return;
     drawCard(state, p);
-    state.phase = 'deploy';
+    state.phase = 'action';
     pushLog(state, side, '第 ' + state.round + ' 轮 · ' + p.short + '回合：补给 ' + p.supply + '/' + p.cap +
       '，牌库 ' + p.deck.length + '。', 'turn');
     checkAnnihilation(state);
@@ -2293,9 +2321,8 @@ button { font-family: inherit; }
   }
 
   function beginAction(state) {
-    if (state.phase !== 'deploy' || state.finished) return { ok: false, error: '当前不是部署阶段' };
+    if (state.finished) return { ok: false, error: '对局已结束' };
     state.phase = 'action';
-    pushLog(state, state.active, state.players[state.active].short + '进入行动阶段。', 'turn');
     return { ok: true };
   }
 
@@ -2339,7 +2366,7 @@ button { font-family: inherit; }
   }
   function deploy(state, cardUid, r, c) {
     if (state.finished) return { ok: false, error: '对局已结束' };
-    if (state.phase !== 'deploy') return { ok: false, error: '只能在部署阶段部署' };
+    if (state.phase !== 'action' && state.phase !== 'deploy') return { ok: false, error: '当前不能部署' };
     const side = state.active;
     const p = state.players[side];
     const idx = p.hand.findIndex(card => card.uid === cardUid);
@@ -3316,7 +3343,13 @@ button { font-family: inherit; }
     const moves = E.moveTargets(state, unit);
     const dests = [{ r: unit.r, c: unit.c, move: false }];
     moves.forEach(t => {
-      if (unit.cls !== 'SS' && E.cellDist(unit.r, unit.c, t.r, t.c) !== 1) return;
+      if (unit.cls !== 'SS') {
+        const d = E.cellDist(unit.r, unit.c, t.r, t.c);
+        const max = unit.move + (unit.buffs.move || 0);
+        if (d > max) return;
+        // 远距离只考虑直线，保证移动后的舰首与 AI 评估的朝向一致
+        if (d > 1 && t.r !== unit.r && t.c !== unit.c) return;
+      }
       dests.push({ r: t.r, c: t.c, move: true });
     });
     dests.forEach(d => {
@@ -3487,7 +3520,7 @@ button { font-family: inherit; }
     const onChange = opts.onChange || (() => {});
     const onEvent = opts.onEvent || (() => {});
     if (!state || state.finished || state.active !== side) return;
-    if (state.phase !== 'deploy') return;
+    if (state.phase !== 'action') return;
     let guard = 0;
 
     // 部署阶段：先部署，再视情况用补给指令继续部署
@@ -3520,7 +3553,6 @@ button { font-family: inherit; }
       if (++guard > 40) break;
     }
     if (state.finished) return;
-    E.beginAction(state);
     onChange();
     await sleep(200);
 
@@ -3567,6 +3599,7 @@ button { font-family: inherit; }
 
 
 
+
 </script>
 <script>
 /* ============================================================
@@ -3578,7 +3611,7 @@ button { font-family: inherit; }
   const D = window.GameData;
   const E = window.GameEngine;
 
-  const PHASE_NAME = { deploy: '部署阶段', action: '行动阶段', gameover: '战役结束', supply: '补给阶段' };
+  const PHASE_NAME = { deploy: '部署/行动', action: '部署/行动', gameover: '战役结束', supply: '补给阶段' };
   const HEAD_NAME = { N: '北', E: '东', S: '南', W: '西' };
   const HEAD_ARROW = { N: '↑', E: '→', S: '↓', W: '←' };
 
@@ -3586,6 +3619,10 @@ button { font-family: inherit; }
   let view = null;
   let handlers = {};
   let lastLogId = 0;
+  let lastTapUid = 0;
+  let lastTapAt = 0;
+  let lastHandCard = 0;
+  let lastHandAt = 0;
   let tooltipEl = null;
   let modalEl = null;
   let audioCtx = null;
@@ -3716,7 +3753,17 @@ button { font-family: inherit; }
     document.getElementById('hand').addEventListener('click', e => {
       const card = e.target.closest('.hcard'); if (!card) return;
       Sound.play('click');
-      if (handlers.onCard) handlers.onCard(parseInt(card.dataset.card, 10));
+      const uid = parseInt(card.dataset.card, 10);
+      const isCmd = card.classList.contains('cmd');
+      if (isCmd) { lastHandCard = 0; lastHandAt = 0; if (handlers.onCard) handlers.onCard(uid); return; }
+      const now = Date.now();
+      if (lastHandCard === uid && now - lastHandAt < 500) {
+        lastHandCard = 0; lastHandAt = 0;
+        if (handlers.onCardInfo) handlers.onCardInfo(uid);
+        return;
+      }
+      lastHandCard = uid; lastHandAt = now;
+      if (handlers.onCard) handlers.onCard(uid);
     });
     document.getElementById('actionBar').addEventListener('click', e => {
       const btn = e.target.closest('[data-act]'); if (!btn || btn.disabled) return;
@@ -3764,11 +3811,6 @@ button { font-family: inherit; }
       if (e.relatedTarget && tipTarget.contains(e.relatedTarget)) return;
       tipTarget = null; hideTooltip();
     });
-    document.addEventListener('touchstart', e => {
-      const t = e.target.closest('[data-tip]');
-      if (t) { const touch = e.touches[0]; showTooltip(t.dataset.tip, touch.clientX, touch.clientY); }
-      else hideTooltip();
-    }, { passive: true });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         if (modalEl) { closeModal(); return; }
@@ -3988,7 +4030,6 @@ button { font-family: inherit; }
     const fc = state.players[u.side].deckSide === 'Allies' ? 'us' : 'jp';
     div.className = `ship-token ${fc} ${view.selectedUid === u.uid ? 'sel' : ''} ${state.lastActor === u.uid ? 'acting' : ''}`;
     div.dataset.uid = u.uid;
-    div.dataset.tip = 'ship:' + u.uid;
     const ratio = Math.max(0, u.hp / u.maxHp);
     const color = hpColor(ratio);
     const badges = [];
@@ -4014,7 +4055,7 @@ button { font-family: inherit; }
     const enemy = u.side !== human;
     const div = document.createElement('div');
     div.className = `sub-token ${enemy ? 'enemy' : ''} ${u.exposed ? 'exposed' : ''}`;
-    div.dataset.uid = u.uid; div.dataset.tip = 'sub:' + u.uid;
+    div.dataset.uid = u.uid;
     div.innerHTML = `<span>潜 ${u.hp}</span><span class="sub-hp"><i style="width:${Math.max(0, u.hp / u.maxHp * 100)}%"></i></span>${u.reload ? '<span class="sub-reload">装填</span>' : ''}`;
     return div;
   }
@@ -4048,8 +4089,7 @@ button { font-family: inherit; }
     const p = state.players[view.humanSide];
     title.textContent = `手牌 · ${p.short}`;
     const myTurn = state.active === view.humanSide && !state.finished && !view.busy;
-    if (state.phase === 'deploy' && myTurn) hint.textContent = '点击舰船卡部署；指令卡也可在部署阶段使用';
-    else if (state.phase === 'action' && myTurn) hint.textContent = p.commandUsed ? '本回合指令卡已用' : '点击指令卡使用（每回合 1 张，注意补给费用）';
+    if (myTurn) hint.textContent = p.commandUsed ? '部署/行动：点击舰船卡部署，点舰船行动；指令已用' : '点击舰船卡部署，点舰船行动；指令卡随时可用（注意补给）';
     else if (state.finished) hint.textContent = '战役结束';
     else hint.textContent = '等待对方行动';
     handEl.innerHTML = p.hand.map(card => handCardHtml(card, p, myTurn)).join('') ||
@@ -4061,12 +4101,12 @@ button { font-family: inherit; }
     const def = isShip ? D.SHIP_DEFS[card.defId] : D.COMMAND_DEFS[card.defId];
     const fc = p.deckSide === 'Allies' ? 'us' : 'jp';
     const selected = view.selectedCardUid === card.uid;
-    const canDeploy = isShip && state.phase === 'deploy' && myTurn && def.cost <= p.supply;
+    const canDeploy = isShip && myTurn && def.cost <= p.supply;
     const canCmd = !isShip && myTurn && !p.commandUsed && def.cost <= p.supply;
     const dim = !myTurn || (isShip ? !canDeploy : !canCmd);
     if (isShip) {
       const airCount = def.air ? Object.values(def.air).reduce((a, b) => a + b, 0) : 0;
-      return `<div class="hcard ${fc} ${selected ? 'sel' : ''} ${dim ? 'dim' : ''}" data-card="${card.uid}" data-tip="card:${card.uid}">
+      return `<div class="hcard ${fc} ${selected ? 'sel' : ''} ${dim ? 'dim' : ''}" data-card="${card.uid}">
         <div class="hc-stripe"></div>
         <div class="hc-cost">${def.cost}</div>
         <div class="hc-points"><b>${def.points}</b> 点</div>
@@ -4081,6 +4121,8 @@ button { font-family: inherit; }
             <span>鱼雷 <b>${def.torpedo || '—'}</b></span>
             <span>装甲 <b>${def.armor}</b></span>
             <span>防空 <b>${def.aa}</b></span>
+            <span>深弹 <b>${def.asw || '—'}</b></span>
+            <span>移动 <b>${def.move}</b></span>
           </div>
         </div>
       </div>`;
@@ -4113,23 +4155,22 @@ button { font-family: inherit; }
     const sel = view.selectedUid ? E.getUnit(state, view.selectedUid) : null;
     let info = '', buttons = '', phaseBtn = '';
 
-    if (state.phase === 'deploy') {
-      const card = view.selectedCardUid ? p.hand.find(c => c.uid === view.selectedCardUid) : null;
-      const affordable = p.hand.some(c => c.kind === 'ship' && D.SHIP_DEFS[c.defId].cost <= p.supply);
-      if (card && card.kind === 'ship') {
-        const def = D.SHIP_DEFS[card.defId];
+    if (view.mode === 'deploy' && view.selectedCardUid) {
+      const card = p.hand.find(c => c.uid === view.selectedCardUid);
+      const def = card && card.kind === 'ship' ? D.SHIP_DEFS[card.defId] : null;
+      if (def) {
         info = `<div class="aname">部署 · ${h(def.name)}</div>
           <div class="astats">${def.cls} · ${def.points} 点 · 补给 ${def.cost}</div>
-          <div class="ahint">点击高亮格部署；再次点击手牌取消</div>`;
+          <div class="ahint">点击高亮格部署；部署后可立即行动，再次点击手牌取消</div>`;
       } else {
-        info = `<div class="aname">部署阶段</div><div class="ahint">${affordable ? '点击舰船卡部署；指令卡可在部署阶段使用。' : '没有可部署的舰船，可以打指令卡或直接开始行动。'}</div>`;
+        info = `<div class="aname">部署</div><div class="ahint">点击高亮格部署。</div>`;
       }
-      buttons = view.selectedCardUid ? `<button class="act-btn ghost" data-act="cancel">取消选择</button>` : '';
-      phaseBtn = `<button class="act-btn gold" data-act="beginAction">开始行动</button>`;
+      buttons = `<button class="act-btn ghost" data-act="cancel">取消选择</button>`;
+      phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
     } else if (view.mode) {
       info = modeInfoHtml(sel);
       buttons = modeButtonsHtml();
-      phaseBtn = `<span class="mini-note">ESC 取消</span>`;
+      phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
     } else if (sel) {
       const canMove = E.canMove(state, sel);
       const canMain = E.canFireMain(state, sel) && E.mainTargets(state, sel).length > 0;
@@ -4140,7 +4181,7 @@ button { font-family: inherit; }
       const canSearch = (sel.cls === 'DD' || sel.cls === 'CVE') && !sel.searchBoost;
       const canFire = canMain || canSec || canTorp || canDepth;
       info = `<div class="aname">${h(sel.name)} <span style="font-size:9px;color:var(--muted)">${sel.cls} · ${h(D.NATIONS[sel.nation].short)}</span></div>
-        <div class="astats">耐久 ${sel.hp}/${sel.maxHp} · 装甲 ${sel.armor + (sel.buffs.armor || 0)} · 防雷 ${sel.bulkhead + (sel.buffs.bulkhead || 0)} · 舰首 ${HEAD_NAME[sel.heading]}</div>
+        <div class="astats">耐久 ${sel.hp}/${sel.maxHp} · 装甲 ${sel.armor + (sel.buffs.armor || 0)} · 防雷 ${sel.bulkhead + (sel.buffs.bulkhead || 0)} · 深弹 ${sel.asw} · 移动 ${sel.move} · 舰首 ${HEAD_NAME[sel.heading]}</div>
         <div class="ahint">${shipStatus(sel) || '尚未行动'}</div>`;
       buttons = `
         <button class="act-btn" data-act="move" ${!canMove ? 'disabled' : ''}>移动</button>
@@ -4151,7 +4192,7 @@ button { font-family: inherit; }
         <button class="act-btn ghost" data-act="cancel">取消</button>`;
       phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
     } else {
-      info = `<div class="aname">舰队指挥</div><div class="ahint">选择一艘己方舰船；主炮/副炮/鱼雷可分别选择目标。指令卡在部署/行动阶段都能用。</div>`;
+      info = `<div class="aname">舰队指挥</div><div class="ahint">点击手牌部署；点击舰船行动；指令卡随时可用。主炮/副炮/鱼雷可分别选择目标。</div>`;
       buttons = `<button class="act-btn" data-act="recon" ${p.reconUsed ? 'disabled' : ''}>侦察 ${p.reconUsed ? '已用' : '1/1'}</button>`;
       phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
     }
@@ -4209,6 +4250,16 @@ button { font-family: inherit; }
     const r = parseInt(cell.dataset.r, 10), c = parseInt(cell.dataset.c, 10);
     const token = e.target.closest('[data-uid]');
     const uid = token ? parseInt(token.dataset.uid, 10) : null;
+    // 手机端：单击选中/操作，只有双击舰船才打开介绍
+    if (uid && !view.mode) {
+      const now = Date.now();
+      if (lastTapUid === uid && now - lastTapAt < 500) {
+        lastTapUid = 0; lastTapAt = 0;
+        if (handlers.onShipInfo) handlers.onShipInfo(uid);
+        return;
+      }
+      lastTapUid = uid; lastTapAt = now;
+    }
     if (handlers.onCell) handlers.onCell(r, c, uid);
   }
 
@@ -4232,6 +4283,8 @@ button { font-family: inherit; }
           <span>副炮</span><b>${sec}</b>
           <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo : '无'}</b>
           <span>防空</span><b>${u.aa}</b>
+          <span>深弹</span><b>${u.asw || '无'}</b>
+          <span>移动</span><b>${u.move}</b>
           <span>装甲</span><b>${u.armor}（炮火减伤）</b>
           <span>防雷隔舱</span><b>${u.bulkhead}（鱼雷减伤）</b>
           <span>起火</span><b>${u.fire}</b>
@@ -4254,6 +4307,7 @@ button { font-family: inherit; }
             <span>副炮</span><b>${def.secondary ? '伤害 ' + def.secondary.damage + '，射程 ' + def.secondary.range : '无'}</b>
             <span>鱼雷</span><b>${def.torpedo || '无'}</b>
             <span>防空</span><b>${def.aa}</b>
+            <span>深弹</span><b>${def.asw || '无'}</b>
             <span>防雷</span><b>${def.bulkhead}</b>
             <span>移动</span><b>${def.move}</b>
           </div>
@@ -4526,7 +4580,7 @@ button { font-family: inherit; }
       <p>战场为 <b>6 条横线（R0–R5）× 5 个纵格（C0–C4）</b>。A 方（玩家）从 R0 向 R5 推进，B 方（AI）相反。R0/R5 是后方，中间四条线是中立前线，不显示归属。</p>
       <p>一局 16 轮。每轮双方各一个回合。轮末比较击沉点数；一方无舰可战则立即判负。</p>
       <h2>1 · 回合与补给</h2>
-      <p>每回合开始：补给上限在本轮提高（第 1 轮 <b>1</b>，第 2 轮 2，之后每轮 +1，最高 10），补给<b>回满到上限</b>；然后抽 1 张牌。部署阶段可支付补给部署任意多艘舰船；行动阶段每艘舰船可以<b>移动一次并开火一次</b>。</p>
+      <p>每回合开始：补给上限在本轮提高（第 1 轮 <b>1</b>，第 2 轮 2，之后每轮 +1，最高 10），补给<b>回满到上限</b>；然后抽 1 张牌。部署与行动合并：本回合可以随时部署舰船、指挥已部署舰船行动、使用指令，最后结束回合。</p>
       <h2>2 · 朝向与射界</h2>
       <p>每艘舰船有舰首方向（北/东/南/西）。主炮、副炮按<b>前/后/左/右</b>四个射界的炮管数计算伤害；例如 3×3 主炮的战列舰，侧舷 9 门、前方 6 门、后方 3 门。移动会将舰首转向移动方向；未移动时可在开火前自由转向一次。</p>
       <h2>3 · 主炮与副炮</h2>
@@ -4535,12 +4589,14 @@ button { font-family: inherit; }
       <p><b>起火</b>：每层每回合造成 2 点伤害。<b>进水</b>：每层每回合造成 1 点伤害；分左舷/右舷，左右差超过 3 时立即倾覆沉没。主炮/炸弹大伤害会引发起火，鱼雷会在命中侧造成进水。损管指令可以移除。</p>
       <h2>5 · 航空</h2>
       <p>航母每回合可移动后出击一次；航程 <b>6 格</b>，逐格规划航路，逐格结算防空（目标格及相邻 1.0，其余 0.5，每架每回合最多 3 点）。鱼雷机造成进水，俯冲轰炸机造成起火；战斗机可缠斗/压制/护航。</p>
-      <h2>6 · 潜艇</h2>
-      <p>潜艇隐藏在水下；敌方 DD/CVE/SS 同线被动发现，DD/CVE 主动搜索、舰队侦察可揭示。鱼雷攻击后暴露到己方下回合；潜艇鱼雷需要一回合装填。</p>
+      <h2>6 · 潜艇与深弹</h2>
+      <p>潜艇隐藏在水下；敌方 DD/CVE/SS 同线被动发现，DD/CVE 主动搜索、舰队侦察可揭示。鱼雷攻击后暴露到己方下回合；潜艇鱼雷需要一回合装填。<b>驱逐舰深弹伤害 6</b>，潜艇只有 6–7 耐久：两艘驱逐舰一轮就能击沉一艘潜艇；潜艇移动力降为 1，驱逐舰移动力 2。</p>
       <h2>7 · 牌组</h2>
       <p>盟军：美/英/法/苏/意；轴心：德/日/意。意大利卡可加入任一阵营。自由牌组：舰船吨位 ≤120 点，主力舰（BB+CV）≤60 点，同名 ≤2，潜艇 ≤1，指令 ≤8，至少 8 艘舰船，总卡 ≤30。AI 使用对方阵营固定牌组。</p>
       <h2>8 · 指令卡</h2>
-      <p>指令卡不占吨位，每回合限 1 张，部署/行动阶段都可使用；每张指令有 <b>1–3 费</b>的补给费用，和部署抢补给。效果包括修理、装甲、防空、鱼雷/主炮强化、直接伤害、起火/进水、禁移动/禁攻击、抽牌、补给、侦察、补充舰载机等。</p>
+      <p>指令卡不占吨位，每回合限 1 张，随时可用；每张指令有 <b>1–3 费</b>的补给费用，和部署抢补给。效果包括修理、装甲、防空、鱼雷/主炮强化、直接伤害、起火/进水、禁移动/禁攻击、抽牌、补给、侦察、补充舰载机等。</p>
+      <h2>9 · 手机操作</h2>
+      <p>单击舰船 = 选中 / 移动 / 开火；<b>双击舰船</b> = 打开完整舰船介绍。手牌里的舰船：单击选中部署，<b>双击查看介绍</b>；指令卡单击使用。</p>
       <div class="rp-note">实现说明：四向射界用主方向判定（斜向取行列差较大的方向）；主炮/副炮分别独立开火；起火/进水在舰船所有者回合开始时结算；潜艇鱼雷装填 1 回合；补给回满机制参考 KARDS 指挥点。第 9 章“特性”未实现。</div>
     </div>`;
     document.getElementById('modalRoot').appendChild(wrap);
@@ -4549,6 +4605,80 @@ button { font-family: inherit; }
   }
 
   function closeModal() { if (modalEl) { modalEl.remove(); modalEl = null; } }
+
+  function showCardInfo(uid) {
+    if (!state) return;
+    const p = state.players[view.humanSide];
+    const card = p && p.hand.find(c => c.uid === uid);
+    if (!card || card.kind !== 'ship') return;
+    const def = D.SHIP_DEFS[card.defId]; if (!def) return;
+    const main = def.main ? `伤害 ${def.main.damage}（前${def.main.arcs.fore}/后${def.main.arcs.aft}/左${def.main.arcs.port}/右${def.main.arcs.starboard}）` : '无';
+    const sec = def.secondary ? `伤害 ${def.secondary.damage}，射程 ${def.secondary.range}` : '无';
+    const air = def.air ? Object.entries(def.air).map(([k, v]) => `${k}×${v}`).join(' ') : '';
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap show';
+    wrap.innerHTML = `<div class="ship-info-panel">
+      <div class="end-kicker">SHIP CARD</div>
+      <div class="ship-info-title">${h(def.name)}</div>
+      <div class="ship-info-sub">${h(D.NATIONS[def.nation].name)} · ${def.cls} · ${def.points} 点 · 部署 ${def.cost} 补给</div>
+      <div class="tt-grid">
+        <span>耐久</span><b>${def.hp}</b>
+        <span>主炮</span><b>${main}</b>
+        <span>副炮</span><b>${sec}</b>
+        <span>鱼雷</span><b>${def.torpedo ? '伤害 ' + def.torpedo : '无'}</b>
+        <span>深弹</span><b>${def.asw || '无'}</b>
+        <span>移动</span><b>${def.move}</b>
+        <span>防空</span><b>${def.aa}</b>
+        <span>装甲</span><b>${def.armor}（炮火减伤）</b>
+        <span>防雷隔舱</span><b>${def.bulkhead}（鱼雷减伤）</b>
+        <span>机库</span><b>${air || '无'}</b>
+      </div>
+      <div class="ship-info-desc">${h(def.flavor || '')}<br>
+      双击手牌查看介绍；单击选中后点高亮格部署。</div>
+      <div class="end-actions"><button class="big-btn" data-close="1">关闭</button></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(wrap);
+    modalEl = wrap;
+    wrap.addEventListener('click', e => { if (e.target === wrap || e.target.dataset.close) closeModal(); });
+  }
+
+  function showShipInfo(uid) {
+    if (!state) return;
+    const u = E.getUnit(state, uid); if (!u) return;
+    const def = D.SHIP_DEFS[u.defId] || {};
+    const main = u.main ? `伤害 ${u.main.damage}（前${u.main.arcs.fore}/后${u.main.arcs.aft}/左${u.main.arcs.port}/右${u.main.arcs.starboard}）` : '无';
+    const sec = u.secondary ? `伤害 ${u.secondary.damage}，射程 ${u.secondary.range}` : '无';
+    const air = u.air ? u.air.map(g => `${g.type}×${g.planes.length}`).join(' ') : '';
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap show';
+    wrap.innerHTML = `<div class="ship-info-panel">
+      <div class="end-kicker">SHIP DOSSIER</div>
+      <div class="ship-info-title">${h(u.name)}</div>
+      <div class="ship-info-sub">${h(D.NATIONS[u.nation].name)} · ${u.cls} · ${h(u.hull || '')}</div>
+      <div class="tt-grid">
+        <span>耐久</span><b>${u.hp} / ${u.maxHp}</b>
+        <span>舰首</span><b>${HEAD_NAME[u.heading]}</b>
+        <span>主炮</span><b>${main}</b>
+        <span>副炮</span><b>${sec}</b>
+        <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo : '无'}</b>
+        <span>深弹</span><b>${u.asw || '无'}</b>
+        <span>移动</span><b>${u.move}</b>
+        <span>防空</span><b>${u.aa}</b>
+        <span>装甲</span><b>${u.armor}（炮火减伤）</b>
+        <span>防雷隔舱</span><b>${u.bulkhead}（鱼雷减伤）</b>
+        <span>起火</span><b>${u.fire}</b>
+        <span>进水</span><b>左 ${u.flood.port} / 右 ${u.flood.starboard}</b>
+        <span>状态</span><b>${h(shipStatus(u) || '正常')}</b>
+        <span>点数</span><b>${u.points}</b>
+      </div>
+      <div class="ship-info-desc">${air ? '机库：' + air + '<br>' : ''}${h(def.flavor || '')}<br>
+      起火：每层每回合 2 伤害。进水：每层每回合 1 伤害；左右差 &gt;3 立即沉没。</div>
+      <div class="end-actions"><button class="big-btn" data-close="1">关闭</button></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(wrap);
+    modalEl = wrap;
+    wrap.addEventListener('click', e => { if (e.target === wrap || e.target.dataset.close) closeModal(); });
+  }
 
   function showInfoPanel() {
     if (!state) return;
@@ -4821,13 +4951,19 @@ button { font-family: inherit; }
   /* ---------------- 导出 ---------------- */
   window.UI = {
     init, render, resetLog, showStart, hideOverlay, showEnd, showRules,
-    showDeckBuilder, closeModal, pickSquadron, confirmBox, openFirePanel, openHeadingPanel, showInfoPanel,
+    showDeckBuilder, closeModal, pickSquadron, confirmBox, openFirePanel, openHeadingPanel, showInfoPanel, showShipInfo, showCardInfo,
     toast, playEvent, Sound,
     get soundOn() { return soundOn; },
     setSpeed(f) { fast = !!f; },
     hideTooltip
   };
 })();
+
+
+
+
+
+
 
 
 
@@ -5078,7 +5214,6 @@ button { font-family: inherit; }
     const p = s.players[app.human];
     const card = p.hand.find(c => c.uid === uid); if (!card) return;
     if (card.kind === 'ship') {
-      if (s.phase !== 'deploy') { UI.toast('只能在部署阶段部署舰船'); return; }
       if (app.selectedCardUid === uid) { app.selectedCardUid = null; app.mode = null; }
       else { app.selectedCardUid = uid; app.selectedUid = null; app.mode = 'deploy'; }
       render(); return;
@@ -5266,6 +5401,8 @@ button { font-family: inherit; }
       onAgain: () => startNewGame(),
       onTitle: () => showTitle(),
       onInfo: () => UI.showInfoPanel(),
+      onShipInfo: uid => UI.showShipInfo(uid),
+      onCardInfo: uid => UI.showCardInfo(uid),
       onSide: side => { app.playerSide = side; UI.showStart(app.decks, side); }
     });
     UI.setSpeed(app.speed > 1);
@@ -5307,5 +5444,4 @@ button { font-family: inherit; }
 </script>
 </body>
 </html>
-
 
