@@ -1376,6 +1376,22 @@ button { font-family: inherit; }
 .ship-info-desc { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 9.5px; line-height: 1.7; color: var(--muted); }
 .ship-info-panel .end-actions { margin-top: 14px; }
 
+/* 联合出击 / 空中单位 */
+.combined-panel { width: min(520px, 94vw); }
+.combined-list { max-height: 38vh; overflow-y: auto; margin: 10px 0; }
+.combined-carrier { border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; margin-bottom: 6px; }
+.combined-name { font-size: 11px; color: var(--gold-2); display: flex; justify-content: space-between; }
+.combined-name span { color: var(--muted); }
+.combined-group { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink); margin: 6px 10px 0 0; }
+.combined-group input { accent-color: #c8a66a; }
+.air-token { position: absolute; right: 3px; top: 3px; z-index: 6; display: flex; align-items: center; gap: 2px;
+  padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(200,166,106,.45);
+  background: rgba(7,14,22,.86); color: var(--gold-2); font-size: 9px; cursor: pointer; }
+.air-token.jp { border-color: rgba(210,90,80,.55); color: #f0a0a0; }
+.air-token.sel { box-shadow: 0 0 0 2px var(--gold-2); }
+.air-token b { font-size: 10px; }
+.air-token i { font-style: normal; font-size: 8px; opacity: .7; }
+
 </style>
 </head>
 <body>
@@ -1805,6 +1821,32 @@ button { font-family: inherit; }
     hull: '呂号潜水艦', torpedo: 5, move: 2, flavor: '中型潜艇。'
   });
 
+  /* ---------- 图纸航母 / 补充航母 ---------- */
+  SHIP_DEFS.us_wasp = ship('us_wasp', '黄蜂', 'US', 'CV', 19000, 15, {
+    points: 15, cost: 3, hull: 'CV-7', aa: 5, air: AIR(3, 3, 2), armor: 1, bulkhead: 1,
+    flavor: '轻量级舰队航母，适合快速补充航空战力。'
+  });
+  SHIP_DEFS.us_midway = ship('us_midway', '中途岛', 'US', 'CV', 45000, 24, {
+    points: 24, cost: 5, hull: 'CVB-41', aa: 7, air: AIR(4, 4, 4), armor: 2, bulkhead: 2,
+    flavor: '图纸中的超级航母，载机量与生存性都更高。'
+  });
+  SHIP_DEFS.uk_malta = ship('uk_malta', '马耳他', 'UK', 'CV', 48000, 22, {
+    points: 22, cost: 4, hull: 'Malta', aa: 8, air: AIR(3, 3, 3), armor: 3, bulkhead: 3,
+    flavor: '英国图纸装甲航母，防空与防护优先。'
+  });
+  SHIP_DEFS.jp_taiho = ship('jp_taiho', '大凤', 'JPN', 'CV', 37000, 20, {
+    points: 20, cost: 4, hull: '航空母艦大鳳', aa: 7, air: AIR(4, 4, 4), armor: 3, bulkhead: 2,
+    flavor: '装甲飞行甲板的正规航母。'
+  });
+  SHIP_DEFS.de_graf_zeppelin = ship('de_graf_zeppelin', '齐柏林伯爵', 'GER', 'CV', 33000, 20, {
+    points: 20, cost: 4, hull: 'Graf Zeppelin', aa: 6, air: AIR(3, 3, 3), armor: 2, bulkhead: 2,
+    flavor: '德国未完工的图纸航母。'
+  });
+  SHIP_DEFS.it_aquila = ship('it_aquila', '天鹰', 'ITA', 'CV', 23000, 16, {
+    points: 16, cost: 3, hull: 'Aquila', aa: 5, air: AIR(2, 3, 2), armor: 1, bulkhead: 1,
+    flavor: '由客轮改装的意大利图纸航母。'
+  });
+
   /* ---------- 舰种速度 / 反潜统一调整 ---------- */
   Object.values(SHIP_DEFS).forEach(d => {
     if (d.cls === 'DD') {
@@ -2083,9 +2125,14 @@ button { font-family: inherit; }
     if (Math.abs(dr) >= Math.abs(dc)) return dr > 0 ? 'S' : dr < 0 ? 'N' : (dc > 0 ? 'E' : 'W');
     return dc > 0 ? 'E' : 'W';
   }
+  const DIR_VEC = { N: [-1, 0], E: [0, 1], S: [1, 0], W: [0, -1] };
+  function firingHeading(u) {
+    if (u.turnPreHeading && (u.turned || u.turnProgress > 0)) return u.turnPreHeading;
+    return u.heading;
+  }
   function arcOf(attacker, target) {
     const b = bearing(attacker, target);
-    const h = attacker.heading;
+    const h = firingHeading(attacker);
     if (b === h) return 'fore';
     if (b === OPP[h]) return 'aft';
     if (b === RIGHT[h]) return 'starboard';
@@ -2138,7 +2185,7 @@ button { font-family: inherit; }
         B: makePlayer('B', aiDeck)
       },
       units: [], airUnits: [],
-      nextUid: 1, nextCardUid: 1,
+      nextUid: 1, nextCardUid: 1, nextAirUid: 1,
       recon: { A: null, B: null },
       revealAll: { A: 0, B: 0 },
       winner: null, endReason: null, finished: false,
@@ -2206,9 +2253,62 @@ button { font-family: inherit; }
   function ownSurfaceInRow(state, side, r) { return state.units.some(u => u.side === side && u.cls !== 'SS' && u.r === r); }
   function enemySurfaceInRow(state, side, r) { return state.units.some(u => u.side !== side && u.cls !== 'SS' && u.r === r); }
   function isControlledRow(state, side, r) { return ownSurfaceInRow(state, side, r) && !enemySurfaceInRow(state, side, r); }
-  function isDeployRow(state, side, r) { return r === backRow(side) || isControlledRow(state, side, r); }
+  function isDeployRow(state, side, r) { return r === backRow(side); }
   function airGroup(unit, type) { return unit.air ? unit.air.find(g => g.type === type) : null; }
   function airAt(state, r, c) { return state.airUnits.filter(a => a.r === r && a.c === c); }
+  function fighterMoveTargets(state, a) {
+    if (!a || a.type !== 'F' || a.side !== state.active || state.phase !== 'action' || a.ap <= 0) return [];
+    const out = [];
+    for (let r = 0; r < D.BOARD_ROWS; r++) for (let c = 0; c < D.BOARD_COLS; c++) {
+      if (r === a.r && c === a.c) continue;
+      if (cellDist(a.r, a.c, r, c) <= a.ap) out.push({ r, c, dist: cellDist(a.r, a.c, r, c) });
+    }
+    return out;
+  }
+  function moveFighter(state, uid, r, c) {
+    const a = state.airUnits.find(x => x.uid === uid);
+    if (!a || a.type !== 'F' || a.side !== state.active || state.phase !== 'action') return { ok: false, error: '该战斗机不能移动' };
+    if (a.ap <= 0) return { ok: false, error: '战斗机没有行动力' };
+    const d = cellDist(a.r, a.c, r, c);
+    if (d < 1 || d > a.ap) return { ok: false, error: '超出战斗机行动力' };
+    const from = { r: a.r, c: a.c };
+    a.ap -= d; a.r = r; a.c = c; a.moved = true;
+    pushLog(state, a.side, '战斗机 R' + from.r + 'C' + from.c + ' → R' + r + 'C' + c + '（剩余行动力 ' + a.ap + '）。', 'air');
+    return { ok: true, from, to: { r, c }, ap: a.ap };
+  }
+  function fighterAttackShip(state, uid, targetUid) {
+    const a = state.airUnits.find(x => x.uid === uid);
+    const t = getUnit(state, targetUid);
+    if (!a || a.type !== 'F' || a.side !== state.active || state.phase !== 'action' || !t || t.side === a.side || t.cls === 'SS') {
+      return { ok: false, error: '目标无效' };
+    }
+    if (a.r !== t.r || a.c !== t.c) return { ok: false, error: '战斗机必须飞到目标舰所在格才能攻击' };
+    if (a.attacked) return { ok: false, error: '本回合已经攻击过' };
+    if (a.ap <= 0) return { ok: false, error: '战斗机没有行动力' };
+    a.ap -= 1; a.attacked = true;
+    const down = a.planes.length;
+    t.aaDown = (t.aaDown || 0) + down;
+    pushLog(state, a.side, '战斗机攻击 ' + unitLabel(t) + '，其防空永久 -' + down + '（当前防空 ' +
+      Math.max(0, t.aa - t.aaDown) + '）。', 'air');
+    return { ok: true, target: t, down, aa: Math.max(0, t.aa - t.aaDown) };
+  }
+  function fighterAttackAir(state, uid, targetUid) {
+    const a = state.airUnits.find(x => x.uid === uid);
+    const t = state.airUnits.find(x => x.uid === targetUid);
+    if (!a || !t || a.type !== 'F' || t.type !== 'F' || a.side === t.side || a.side !== state.active || state.phase !== 'action') {
+      return { ok: false, error: '目标无效' };
+    }
+    if (a.r !== t.r || a.c !== t.c) return { ok: false, error: '战斗机必须与敌机同格才能缠斗' };
+    if (a.attacked) return { ok: false, error: '本回合已经攻击过' };
+    if (a.ap <= 0) return { ok: false, error: '战斗机没有行动力' };
+    a.ap -= 1; a.attacked = true;
+    const atkDmg = a.planes.length, defDmg = t.planes.length;
+    const atkLost = applyPlaneDamage(a.planes, defDmg);
+    const defLost = applyPlaneDamage(t.planes, atkDmg);
+    state.airUnits = state.airUnits.filter(x => x.planes.length > 0);
+    pushLog(state, a.side, '战斗机缠斗：击落敌机 ' + defLost.length + ' 架，损失 ' + atkLost.length + ' 架。', 'air');
+    return { ok: true, atkLost: atkLost.length, defLost: defLost.length };
+  }
 
   /* ---------------- 建舰 ---------------- */
   function createUnit(state, side, def, r, c) {
@@ -2216,6 +2316,13 @@ button { font-family: inherit; }
       type,
       planes: Array.from({ length: def.air[type] }, () => ({ hp: D.PLANE_INFO[type].hp, maxHp: D.PLANE_INFO[type].hp }))
     })) : null;
+    const apMax = def.cls === 'DD' ? 2 : 1;
+    const turnCost = ['BB', 'CV', 'CVL', 'CVE'].includes(def.cls) ? 3 : 1;
+    const torpedoState = def.torpedo ? {
+      fore: { reload: 0, fired: false },
+      port: { reload: 0, fired: false },
+      starboard: { reload: 0, fired: false }
+    } : null;
     return {
       uid: state.nextUid++, defId: def.id, side, nation: def.nation,
       name: def.name, hull: def.hull || '', cls: def.cls,
@@ -2223,10 +2330,12 @@ button { font-family: inherit; }
       hp: def.hp, maxHp: def.hp,
       main: def.main ? JSON.parse(JSON.stringify(def.main)) : null,
       secondary: def.secondary ? JSON.parse(JSON.stringify(def.secondary)) : null,
-      aa: def.aa, torpedo: def.torpedo, asw: def.asw,
+      aa: def.aa, aaDown: 0, torpedo: def.torpedo, asw: def.asw,
       move: def.move, armor: def.armor, bulkhead: def.bulkhead,
       points: def.points,
-      moved: false, firedMain: false, firedSecondary: false, firedTorp: false, firedDepth: false, launched: false, reload: 0,
+      ap: apMax, apMax, turnCost, turnProgress: 0, turnTarget: null, turnPreHeading: null, turned: false,
+      torpedoState,
+      moved: false, justDeployed: false, firedMain: false, firedSecondary: false, firedTorp: false, firedDepth: false, firedAA: false, launched: false,
       fire: 0, flood: { port: 0, starboard: 0 },
       buffs: {}, debuffs: {},
       searchBoost: false, exposed: false,
@@ -2247,15 +2356,24 @@ button { font-family: inherit; }
 
     // 清上一回合的增益、重置行动标记
     unitsOf(state, side).forEach(u => {
-      const firedLast = u.firedTorp;
       u.buffs = {};
+      u.ap = u.apMax;
       u.moved = false;
+      u.justDeployed = false;
       u.firedMain = false;
       u.firedSecondary = false;
       u.firedTorp = false;
       u.firedDepth = false;
+      u.firedAA = false;
       u.launched = false;
-      if (u.cls === 'SS' && u.reload > 0 && !firedLast) u.reload--;
+      u.turned = false;
+      if (u.turnProgress === 0) u.turnPreHeading = null;
+      if (u.torpedoState) {
+        Object.values(u.torpedoState).forEach(st => {
+          if (st.reload > 0) st.reload--;
+          st.fired = false;
+        });
+      }
       u.searchBoost = false;
       if (u.cls === 'SS') u.exposed = false;
     });
@@ -2305,19 +2423,14 @@ button { font-family: inherit; }
   }
 
   function returnEscorts(state, side) {
-    const keep = [];
+    // 战斗机留在场上，每回合刷新 6 点行动力；其他临时机队返航
+    state.airUnits = state.airUnits.filter(a => a.side !== side || a.type === 'F');
     state.airUnits.forEach(a => {
-      if (a.side !== side) { keep.push(a); return; }
-      const carrier = getUnit(state, a.carrierUid);
-      if (carrier) {
-        const g = airGroup(carrier, a.type);
-        if (g) g.planes.push.apply(g.planes, a.planes.filter(x => x.hp > 0));
-        pushLog(state, side, carrier.name + ' 的战斗机护航队返航（' + a.planes.length + ' 架）。', 'air');
-      } else {
-        pushLog(state, side, '护航战斗机失去母舰，' + a.planes.length + ' 架损失。', 'air');
-      }
+      if (a.side !== side || a.type !== 'F') return;
+      a.ap = a.apMax || 6;
+      a.attacked = false;
+      a.moved = false;
     });
-    state.airUnits = keep;
   }
 
   function beginAction(state) {
@@ -2379,95 +2492,89 @@ button { font-family: inherit; }
     p.hand.splice(idx, 1);
     p.supply -= def.cost;
     const u = createUnit(state, side, def, r, c);
+    u.justDeployed = true;
     state.units.push(u);
     pushLog(state, side, unitLabel(u) + ' 部署至 R' + r + 'C' + c + '（补给 -' + def.cost + '）。', 'deploy');
     return { ok: true, unit: u };
   }
 
-  /* ---------------- 移动 / 转向 ---------------- */
+  /* ---------------- 移动 / 转向 / 行动点 ---------------- */
   function canMove(state, u) {
-    return !!u && !state.finished && state.phase === 'action' && u.side === state.active && !u.moved && !u.debuffs.rooted &&
-      !u.firedMain && !u.firedSecondary && !u.firedTorp && !u.firedDepth && !u.launched;
+    return !!u && !state.finished && state.phase === 'action' && u.side === state.active &&
+      u.ap > 0 && !u.justDeployed && !u.turned && u.turnProgress === 0 && !u.debuffs.rooted &&
+      !u.firedMain && !u.firedSecondary && !u.firedTorp && !u.firedDepth && !u.firedAA && !u.launched;
   }
   function moveTargets(state, u) {
     if (!canMove(state, u)) return [];
-    const steps = u.move + (u.buffs.move || 0);
+    const vec = DIR_VEC[u.heading];
+    const maxDist = u.ap + (u.buffs.move || 0);
     const out = [];
-    if (u.cls === 'SS') {
-      for (let r = 0; r < D.BOARD_ROWS; r++) for (let c = 0; c < D.BOARD_COLS; c++) {
-        const d = cellDist(u.r, u.c, r, c);
-        if (d < 1 || d > steps) continue;
-        if (subAt(state, r, c)) continue;
-        out.push({ r, c });
+    let r = u.r, c = u.c;
+    for (let d = 1; d <= maxDist; d++) {
+      r += vec[0]; c += vec[1];
+      if (!inBounds(r, c)) break;
+      if (u.cls === 'SS') {
+        if (subAt(state, r, c)) break;
+      } else if (surfaceAt(state, r, c)) {
+        break;
       }
-      return out;
-    }
-    const seen = {};
-    seen[u.r + ',' + u.c] = null;
-    let frontier = [{ r: u.r, c: u.c, d: 0 }];
-    while (frontier.length) {
-      const next = [];
-      frontier.forEach(cur => {
-        if (cur.d >= steps) return;
-        DIRS.forEach(d => {
-          const r = cur.r + d[0], c = cur.c + d[1], k = r + ',' + c;
-          if (!inBounds(r, c) || seen[k] !== undefined) return;
-          if (surfaceAt(state, r, c)) return;
-          seen[k] = { r: cur.r, c: cur.c };
-          out.push({ r, c });
-          next.push({ r, c, d: cur.d + 1 });
-        });
-      });
-      frontier = next;
+      out.push({ r, c, dist: d });
     }
     return out;
   }
   function moveUnit(state, uid, r, c) {
     const u = getUnit(state, uid);
     if (!canMove(state, u)) return { ok: false, error: '该舰本回合不能移动' };
-    const ok = moveTargets(state, u).some(t => t.r === r && t.c === c);
-    if (!ok) return { ok: false, error: '无法移动到该格' };
+    const target = moveTargets(state, u).find(t => t.r === r && t.c === c);
+    if (!target) return { ok: false, error: '只能沿舰首方向前进，且受行动点限制' };
     const from = { r: u.r, c: u.c };
-    if (u.cls === 'SS') {
-      u.r = r; u.c = c;
-    } else {
-      // 找到到目标的路径，朝向取最后一步方向
-      const seen = {}; const prev = {};
-      seen[u.r + ',' + u.c] = true;
-      let q = [{ r: u.r, c: u.c }]; let found = false;
-      while (q.length && !found) {
-        const nq = [];
-        q.forEach(cur => {
-          DIRS.forEach(d => {
-            const nr = cur.r + d[0], nc = cur.c + d[1], k = nr + ',' + nc;
-            if (!inBounds(nr, nc) || seen[k] || surfaceAt(state, nr, nc)) return;
-            seen[k] = true; prev[k] = cur;
-            if (nr === r && nc === c) { found = true; return; }
-            nq.push({ r: nr, c: nc });
-          });
-        });
-        q = nq;
-      }
-      if (!found) return { ok: false, error: '无法移动到该格' };
-      let step = { r, c };
-      while (prev[step.r + ',' + step.c] && !(prev[step.r + ',' + step.c].r === u.r && prev[step.r + ',' + step.c].c === u.c)) {
-        step = prev[step.r + ',' + step.c];
-      }
-      u.heading = bearing({ r: step.r, c: step.c }, { r, c });
-      u.r = r; u.c = c;
-    }
+    u.ap = Math.max(0, u.ap - target.dist);
+    u.r = r; u.c = c;
     u.moved = true;
-    pushLog(state, u.side, unitLabel(u) + ' R' + from.r + 'C' + from.c + ' → R' + r + 'C' + c + '，舰首朝' + headingName(u.heading) + '。', 'move');
-    return { ok: true, from, to: { r, c }, heading: u.heading };
+    pushLog(state, u.side, unitLabel(u) + ' R' + from.r + 'C' + from.c + ' → R' + r + 'C' + c +
+      '（前进 ' + target.dist + ' 格，剩余行动点 ' + u.ap + '）。', 'move');
+    return { ok: true, from, to: { r, c }, heading: u.heading, ap: u.ap, dist: target.dist };
+  }
+  function canTurn(state, u) {
+    if (!u || state.finished || state.phase !== 'action' || u.side !== state.active) return false;
+    if (u.ap < 1 || u.justDeployed || u.firedMain || u.firedSecondary || u.firedTorp || u.firedDepth || u.firedAA || u.launched) return false;
+    return true;
   }
   function turnUnit(state, uid, heading) {
     const u = getUnit(state, uid);
-    if (!u || u.side !== state.active || u.moved || state.phase !== 'action') return { ok: false, error: '该舰本回合不能转向' };
-    if (u.firedMain || u.firedSecondary || u.firedTorp || u.firedDepth || u.launched) return { ok: false, error: '开火后不能再转向' };
+    if (!u || u.side !== state.active || state.phase !== 'action') return { ok: false, error: '该舰本回合不能转向' };
     if (!['N', 'E', 'S', 'W'].includes(heading)) return { ok: false, error: '方向无效' };
-    u.heading = heading;
-    pushLog(state, u.side, unitLabel(u) + ' 转向，舰首朝' + headingName(heading) + '。', 'move');
-    return { ok: true, heading };
+    if (!canTurn(state, u)) return { ok: false, error: u.ap < 1 ? '没有行动点' : (u.justDeployed ? '刚部署本回合不能转向' : '开火后不能转向') };
+    if (u.turnProgress > 0) {
+      if (heading !== u.turnTarget) return { ok: false, error: '转向进行中，只能继续当前方向' };
+      u.ap -= 1;
+      u.turnProgress += 1;
+      u.turned = true;
+      if (u.turnProgress >= u.turnCost) {
+        u.heading = u.turnTarget;
+        u.turnProgress = 0;
+        u.turnTarget = null;
+        pushLog(state, u.side, unitLabel(u) + ' 完成转向，舰首朝' + headingName(u.heading) + '；本轮仍按转向前的炮位开火。', 'move');
+      } else {
+        pushLog(state, u.side, unitLabel(u) + ' 转向中 ' + u.turnProgress + '/' + u.turnCost + '，舰首暂朝' + headingName(u.heading) + '。', 'move');
+      }
+    } else {
+      if (!u.turnPreHeading) u.turnPreHeading = u.heading;
+      u.turnTarget = heading;
+      u.turnProgress = 1;
+      u.ap -= 1;
+      u.turned = true;
+      if (u.turnProgress >= u.turnCost) {
+        u.heading = heading;
+        u.turnProgress = 0;
+        u.turnTarget = null;
+        pushLog(state, u.side, unitLabel(u) + ' 转向，舰首朝' + headingName(u.heading) + '；本轮仍按转向前的炮位开火。', 'move');
+      } else {
+        pushLog(state, u.side, unitLabel(u) + ' 开始转向 ' + headingName(heading) + '，进度 1/' + u.turnCost +
+          '，舰首暂朝' + headingName(u.heading) + '。', 'move');
+      }
+    }
+    return { ok: true, heading: u.heading, target: u.turnTarget || u.heading, progress: u.turnProgress, cost: u.turnCost, ap: u.ap, turned: u.turned };
   }
 
   /* ---------------- 开火 ---------------- */
@@ -2477,8 +2584,17 @@ button { font-family: inherit; }
   function canFireSecondary(state, u) {
     return !!u && u.secondary && !u.firedSecondary && u.side === state.active && state.phase === 'action' && !u.debuffs.dazed;
   }
-  function canFireTorp(state, u) {
-    return !!u && u.torpedo > 0 && !u.firedTorp && !u.reload && u.side === state.active && state.phase === 'action' && !u.debuffs.dazed;
+  function canFireTorp(state, u, side) {
+    if (!u || !(u.torpedo > 0) || !u.torpedoState || u.side !== state.active || state.phase !== 'action' || u.debuffs.dazed) return false;
+    if (side) {
+      const st = u.torpedoState[side];
+      return !!st && !st.fired && st.reload <= 0;
+    }
+    if (u.cls === 'SS') return !u.torpedoState.fore.fired && u.torpedoState.fore.reload <= 0;
+    return ['port', 'starboard'].some(s => {
+      const st = u.torpedoState[s];
+      return st && !st.fired && st.reload <= 0;
+    });
   }
   function canFireDepth(state, u) {
     return !!u && u.asw > 0 && !u.firedDepth && u.side === state.active && state.phase === 'action' && !u.debuffs.dazed;
@@ -2493,13 +2609,13 @@ button { font-family: inherit; }
     return state.units.filter(t => t.side !== u.side && t.cls !== 'SS' && dist(u, t) <= u.secondary.range &&
       (u.secondary.arcs[arcOf(u, t)] || 0) > 0 && !t.buffs.smoke);
   }
-  function torpedoTargets(state, u) {
-    if (!canFireTorp(state, u)) return [];
+  function torpedoTargets(state, u, side) {
+    if (u && u.cls === 'SS') side = 'fore';
+    if (!canFireTorp(state, u, side)) return [];
+    const sides = side ? [side] : (u.cls === 'SS' ? ['fore'] : ['port', 'starboard']);
     return state.units.filter(t => {
       if (t.side === u.side || t.cls === 'SS' || dist(u, t) !== 1) return false;
-      if (u.cls === 'SS') return true;
-      const a = arcOf(u, t);
-      return a === 'fore' || a === 'port' || a === 'starboard';
+      return sides.includes(arcOf(u, t));
     });
   }
   function depthTargets(state, u) {
@@ -2570,35 +2686,45 @@ button { font-family: inherit; }
       '，造成 ' + info.final + ' 点伤害' + (fire ? '，起火 1 层' : '') + (res.sunk ? '，目标沉没！' : '（剩余 ' + res.hp + '）。'), 'combat');
     return { ok: true, kind: 'secondary', damage: info.final, hp: res.hp, sunk: res.sunk, points: res.points || 0, fire, info };
   }
-  function fireTorpedo(state, uid, targetUid) {
+  function fireTorpedo(state, uid, targetUid, sideArg) {
     const u = getUnit(state, uid), t = getUnit(state, targetUid);
-    if (!canFireTorp(state, u)) return { ok: false, error: '本回合不能再发射鱼雷' };
-    if (!t || t.side === u.side || t.cls === 'SS') return { ok: false, error: '目标无效' };
+    if (!u || !t || t.side === u.side || t.cls === 'SS') return { ok: false, error: '目标无效' };
     if (dist(u, t) !== 1) return { ok: false, error: '目标超出鱼雷射程' };
-    if (u.cls !== 'SS') {
+    let side;
+    if (u.cls === 'SS') {
+      if (arcOf(u, t) !== 'fore') return { ok: false, error: '潜艇只有舰首鱼雷，目标必须在舰首' };
+      side = 'fore';
+    } else {
       const a = arcOf(u, t);
-      if (a === 'aft') return { ok: false, error: '鱼雷无法向舰尾发射' };
+      if (a !== 'port' && a !== 'starboard') return { ok: false, error: '鱼雷只能攻击左舷或右舷目标' };
+      if (sideArg && sideArg !== a) return { ok: false, error: '目标不在该侧鱼雷射界内' };
+      side = a;
     }
+    if (!canFireTorp(state, u, side)) return { ok: false, error: '该侧鱼雷正在装填或本回合已发射' };
     const info = torpedoAttackInfo(u, t);
+    const st = u.torpedoState[side];
+    st.fired = true;
+    st.reload = 1;
     u.firedTorp = true;
-    if (u.cls === 'SS') { u.exposed = true; u.reload = 1; }
+    if (u.cls === 'SS') u.exposed = true;
     const res = applyHp(state, t, info.final, u.side, 'torpedo');
-    let side = null, flood = 0;
+    let floodSide = null, flood = 0;
     if (!res.sunk) {
-      side = relativeArc(t, u);
-      if (side === 'fore' || side === 'aft') side = t.flood.port <= t.flood.starboard ? 'port' : 'starboard';
+      floodSide = relativeArc(t, u);
+      if (floodSide === 'fore' || floodSide === 'aft') floodSide = t.flood.port <= t.flood.starboard ? 'port' : 'starboard';
       flood = info.final >= 8 ? 2 : 1;
-      t.flood[side] += flood;
+      t.flood[floodSide] += flood;
       if (Math.abs(t.flood.port - t.flood.starboard) > 3) {
         pushLog(state, u.side, unitLabel(t) + ' 进水失衡（左 ' + t.flood.port + ' / 右 ' + t.flood.starboard + '），倾覆沉没！', 'sink');
         sinkUnit(state, t, u.side, '进水失衡');
-        return { ok: true, kind: 'torpedo', damage: info.final, hp: 0, sunk: true, points: t.points, flood, floodSide: side, info };
+        return { ok: true, kind: 'torpedo', side, damage: info.final, hp: 0, sunk: true, points: t.points, flood, floodSide, info };
       }
     }
-    pushLog(state, u.side, unitLabel(u) + ' 发射鱼雷命中 ' + unitLabel(t) + '，造成 ' + info.final +
-      ' 点伤害' + (flood ? '，' + (side === 'port' ? '左舷' : '右舷') + '进水 ' + flood : '') +
+    const sideLabel = side === 'fore' ? '舰首' : side === 'port' ? '左舷' : '右舷';
+    pushLog(state, u.side, unitLabel(u) + ' ' + sideLabel + '鱼雷命中 ' + unitLabel(t) + '，造成 ' + info.final +
+      ' 点伤害' + (flood ? '，' + (floodSide === 'port' ? '左舷' : '右舷') + '进水 ' + flood : '') +
       (res.sunk ? '，目标沉没！' : '（剩余 ' + res.hp + '）。') + (u.cls === 'SS' ? ' 潜艇暴露。' : ''), 'combat');
-    return { ok: true, kind: 'torpedo', damage: info.final, hp: res.hp, sunk: res.sunk, points: res.points || 0, flood, floodSide: side, info };
+    return { ok: true, kind: 'torpedo', side, damage: info.final, hp: res.hp, sunk: res.sunk, points: res.points || 0, flood, floodSide, info };
   }
   function fireDepth(state, uid, targetUid) {
     const u = getUnit(state, uid), t = getUnit(state, targetUid);
@@ -2611,6 +2737,34 @@ button { font-family: inherit; }
     pushLog(state, u.side, unitLabel(u) + ' 投下深水炸弹，命中 ' + unitLabel(t) + ' ' + u.asw + ' 点' +
       (res.sunk ? '，潜艇沉没！' : '（剩余 ' + res.hp + '）。'), 'combat');
     return { ok: true, kind: 'depth', damage: u.asw, hp: res.hp, sunk: res.sunk, points: res.points || 0 };
+  }
+
+  /* ---------------- 防空炮 ---------------- */
+  function aaPower(u) {
+    return Math.max(0, u.aa - (u.aaDown || 0) + (u.buffs.aa || 0));
+  }
+  function canFireAA(state, u) {
+    return !!u && aaPower(u) > 0 && !u.firedAA && u.side === state.active && state.phase === 'action' && !u.debuffs.dazed;
+  }
+  function aaTargets(state, u) {
+    if (!canFireAA(state, u)) return [];
+    return state.airUnits.filter(a => a.side !== u.side && a.type === 'F' && a.planes.length > 0 &&
+      cellDist(u.r, u.c, a.r, a.c) <= 1);
+  }
+  function aaAttackValue(u) { return aaPower(u); }
+  function fireAA(state, uid, targetAirUid) {
+    const u = getUnit(state, uid);
+    if (!canFireAA(state, u)) return { ok: false, error: '本回合不能再进行防空射击' };
+    const t = state.airUnits.find(a => a.uid === targetAirUid);
+    if (!t || t.side === u.side || t.type !== 'F') return { ok: false, error: '目标不是敌方战斗机' };
+    if (cellDist(u.r, u.c, t.r, t.c) > 1) return { ok: false, error: '目标超出防空炮射程' };
+    u.firedAA = true;
+    const power = aaPower(u);
+    const lost = applyPlaneDamage(t.planes, power);
+    state.airUnits = state.airUnits.filter(a => a.planes.length > 0);
+    pushLog(state, u.side, unitLabel(u) + ' 防空炮射击敌方战斗机，击落 ' + lost.length + ' 架' +
+      (t.planes.length ? '（剩余 ' + t.planes.length + ' 架）。' : '，敌机全灭！'), 'combat');
+    return { ok: true, kind: 'aa', power, lost: lost.length, left: t.planes.length };
   }
 
   /* ---------------- 潜艇探测 ---------------- */
@@ -2674,8 +2828,8 @@ button { font-family: inherit; }
       (reason ? ' · ' + reason : ''), 'sink');
     if (unit.air) {
       state.airUnits = state.airUnits.filter(a => {
-        if (a.carrierUid === unit.uid) {
-          pushLog(state, unit.side, unitLabel(unit) + ' 沉没，' + a.planes.length + ' 架护航机坠海。', 'air');
+        if (a.carrierUid === unit.uid && a.type !== 'F') {
+          pushLog(state, unit.side, unitLabel(unit) + ' 沉没，' + a.planes.length + ' 架舰载机坠海。', 'air');
           return false;
         }
         return true;
@@ -2750,9 +2904,8 @@ button { font-family: inherit; }
     let total = 0;
     state.units.forEach(u => {
       if (u.side !== defenderSide || u.cls === 'SS' || u.r !== r || u.c !== c) return;
-      total += Math.max(0, u.aa + (u.buffs.aa || 0) - (u.buffs.aaDown || 0));
+      total += Math.max(0, u.aa - (u.aaDown || 0) + (u.buffs.aa || 0));
     });
-    state.airUnits.forEach(a => { if (a.side === defenderSide && a.type === 'F' && a.r === r && a.c === c) total += a.planes.length; });
     const near = cellDist(r, c, targetR, targetC) <= 1;
     const coeff = near ? 1 : 0.5;
     let per = roundHalfUp(total * coeff);
@@ -2804,6 +2957,27 @@ button { font-family: inherit; }
       }
       steps.push({ r: cell.r, c: cell.c, aa: aa.total, coeff: aa.coeff, perPlane: aa.per, losses: lost.length, alive: planes.length });
       if (!planes.length) { wiped = true; break; }
+      if (!isTarget) {
+        const cellFighters = state.airUnits.filter(a => a.side === defender && a.type === 'F' && a.r === cell.r && a.c === cell.c);
+        if (cellFighters.length) {
+          let fPool = [];
+          cellFighters.forEach(a => { fPool = fPool.concat(a.planes); a.planes = []; });
+          const fDmg = fPool.length;
+          if (type === 'F') {
+            applyPlaneDamage(planes, fDmg);
+            applyPlaneDamage(fPool, planes.length + lost.length);
+          } else {
+            applyPlaneDamage(planes, fDmg);
+          }
+          let k = 0;
+          while (fPool.length && cellFighters.length) {
+            cellFighters[k % cellFighters.length].planes.push(fPool.shift());
+            k++;
+          }
+          state.airUnits = state.airUnits.filter(a => a.planes.length > 0);
+          if (!planes.length) { wiped = true; break; }
+        }
+      }
     }
     let dogfight = null, shipDamage = 0, sunk = false, fire = 0, flood = 0, floodSide = null, escort = null;
     if (!wiped) {
@@ -2848,17 +3022,24 @@ button { font-family: inherit; }
           (flood ? '，进水 ' + flood : '') + (sunk ? '，击沉！' : '。'), 'air');
       }
       if (type === 'F' && planes.length) {
-        if (v.friendly && !targetShip && !hasDF) {
-          escort = { r: target.r, c: target.c };
-          state.airUnits.push({ side: c.side, carrierUid: c.uid, type: 'F', planes, r: target.r, c: target.c, fighterBonus: 0 });
-          g.planes = [];
-          pushLog(state, c.side, c.name + ' 派出 ' + planes.length + ' 架战斗机为 ' + v.friendly.name + ' 护航（本回合防空 +' + planes.length + '）。', 'air');
-        } else if (targetShip && targetShip.hp > 0) {
-          targetShip.buffs.aaDown = (targetShip.buffs.aaDown || 0) + planes.length;
-          pushLog(state, c.side, c.name + ' 的 ' + planes.length + ' 架战斗机压制 ' + targetShip.name + '，其防空 -' + planes.length + '。', 'air');
+        const air = {
+          uid: state.nextAirUid++, side: c.side, carrierUid: c.uid, type: 'F',
+          planes, r: target.r, c: target.c, ap: 6, apMax: 6, attacked: false, moved: false
+        };
+        state.airUnits.push(air);
+        escort = { r: target.r, c: target.c };
+        if (targetShip && targetShip.hp > 0) {
+          targetShip.aaDown = (targetShip.aaDown || 0) + planes.length;
+          pushLog(state, c.side, c.name + ' 的 ' + planes.length + ' 架战斗机压制 ' + targetShip.name +
+            '，其防空永久 -' + planes.length + '。', 'air');
+        } else if (v.friendly) {
+          pushLog(state, c.side, c.name + ' 派出 ' + planes.length + ' 架战斗机为 ' + v.friendly.name + ' 护航，战斗机留在战场。', 'air');
+        } else {
+          pushLog(state, c.side, c.name + ' 的 ' + planes.length + ' 架战斗机留在战场。', 'air');
         }
+        g.planes = [];
       }
-      if (!escort) g.planes = planes;
+      if (type !== 'F') g.planes = planes;
     } else {
       g.planes = [];
       pushLog(state, c.side, c.name + ' 的' + D.PLANE_INFO[type].name + '队在抵达前被全部击落。', 'air');
@@ -2889,6 +3070,102 @@ button { font-family: inherit; }
       left--; added++;
     }
     return added;
+  }
+
+  function combinedCarrierStrike(state, picks, targetUid) {
+    if (!state || state.finished || state.phase !== 'action') return { ok: false, error: '当前不能出击' };
+    const target = getUnit(state, targetUid);
+    if (!target || target.side === state.active || target.cls === 'SS') return { ok: false, error: '目标无效' };
+    if (!picks || !picks.length) return { ok: false, error: '没有选择舰载机' };
+    const squads = [];
+    const seen = {};
+    for (const pick of picks) {
+      const carrier = getUnit(state, pick.carrierUid);
+      if (!carrier || carrier.side !== state.active || carrier.launched || carrier.debuffs.dazed) return { ok: false, error: '有航母本回合不能出击' };
+      if (cellDist(carrier.r, carrier.c, target.r, target.c) > D.MAX_PATH) return { ok: false, error: carrier.name + ' 超出航程' };
+      const g = airGroup(carrier, pick.type);
+      if (!g || !g.planes.length) return { ok: false, error: carrier.name + ' 没有该中队' };
+      const key = carrier.uid + ':' + pick.type;
+      if (seen[key]) continue;
+      seen[key] = true;
+      squads.push({ carrier, type: pick.type, planes: g.planes.map(p => ({ hp: p.hp, maxHp: p.maxHp, dmgTaken: 0 })) });
+    }
+    if (!squads.length) return { ok: false, error: '没有可用机队' };
+    const defender = otherSide(state.active);
+    const enemyFighters = state.airUnits.filter(a => a.side === defender && a.type === 'F' && a.r === target.r && a.c === target.c);
+    const aa = computeCellAA(state, target.r, target.c, defender, target.r, target.c, enemyFighters.length > 0);
+    let defPool = [];
+    enemyFighters.forEach(a => { defPool = defPool.concat(a.planes); a.planes = []; });
+    const defF = defPool.length;
+    let atkF = 0;
+    squads.forEach(s => { if (s.type === 'F') atkF += s.planes.length; });
+    const planeAA = Math.min(3, aa.per);
+    squads.forEach(s => {
+      s.planes.forEach(p => {
+        p.dmgTaken += planeAA; p.hp -= planeAA;
+      });
+    });
+    if (defF) {
+      squads.forEach(s => applyPlaneDamage(s.planes, defF));
+      if (atkF) applyPlaneDamage(defPool, atkF);
+    }
+    let k = 0;
+    while (defPool.length && enemyFighters.length) { enemyFighters[k % enemyFighters.length].planes.push(defPool.shift()); k++; }
+    state.airUnits = state.airUnits.filter(a => a.planes.length > 0);
+    let db = 0, tb = 0, f = 0;
+    squads.forEach(s => {
+      const alive = s.planes.filter(p => p.hp > 0);
+      s.planes = alive;
+      if (s.type === 'F') f += alive.length;
+      if (s.type === 'DB') db += alive.length;
+      if (s.type === 'TB') tb += alive.length;
+    });
+    let shipDamage = 0, fire = 0, flood = 0, sunk = false, floodSide = null;
+    if (db > 0 && target.hp > 0) {
+      const dmg = Math.max(1, db * 2);
+      const r = applyHp(state, target, dmg, state.active, 'bomb');
+      shipDamage += dmg; sunk = r.sunk;
+      if (!sunk && dmg >= 5) { fire = 1; target.fire += 1; }
+    }
+    if (tb > 0 && target.hp > 0) {
+      let raw = tb * 3;
+      squads.forEach(s => { if (s.type === 'TB') raw += (s.carrier.buffs.torp || 0); });
+      const dmg = Math.max(1, raw - target.bulkhead - (target.buffs.bulkhead || 0));
+      const r = applyHp(state, target, dmg, state.active, 'airTorp');
+      shipDamage += dmg; sunk = r.sunk;
+      if (!sunk) {
+        floodSide = target.flood.port <= target.flood.starboard ? 'port' : 'starboard';
+        flood = dmg >= 8 ? 2 : 1;
+        target.flood[floodSide] += flood;
+        if (Math.abs(target.flood.port - target.flood.starboard) > 3) {
+          sinkUnit(state, target, state.active, '进水失衡');
+          sunk = true;
+        }
+      }
+    }
+    if (f > 0 && target.hp > 0) {
+      target.aaDown = (target.aaDown || 0) + f;
+    }
+    squads.forEach(s => {
+      s.carrier.launched = true;
+      if (s.type === 'F') {
+        if (s.planes.length) {
+          state.airUnits.push({
+            uid: state.nextAirUid++, side: s.carrier.side, carrierUid: s.carrier.uid, type: 'F',
+            planes: s.planes, r: target.r, c: target.c, ap: 6, apMax: 6, attacked: false, moved: false
+          });
+        }
+        airGroup(s.carrier, 'F').planes = [];
+      } else {
+        airGroup(s.carrier, s.type).planes = s.planes;
+      }
+    });
+    pushLog(state, state.active, '联合出击：' + squads.length + ' 个中队攻击 ' + unitLabel(target) +
+      '，只承受一次防空（每机 ' + planeAA + '），造成 ' + shipDamage + ' 点伤害' +
+      (fire ? '，起火' : '') + (flood ? '，进水 ' + flood : '') + (sunk ? '，击沉！' : '。') +
+      (f ? ' 战斗机压制防空 -' + f + '。' : ''), 'air');
+    return { ok: true, kind: 'combined', damage: shipDamage, fire, flood, floodSide, sunk,
+      points: sunk ? target.points : 0, aa: aa.total, perPlane: planeAA, fighters: f };
   }
 
   function commandTargets(state, side, cmd) {
@@ -3054,19 +3331,28 @@ button { font-family: inherit; }
     unitsOf, getUnit, surfaceAt, subAt, ownSurfaceInRow, enemySurfaceInRow,
     isControlledRow, isDeployRow, airGroup, airAt,
     isValidDeployCell, deployCells, deploy, createUnit,
-    canMove, moveTargets, moveUnit, turnUnit,
-    canFireMain, canFireSecondary, canFireTorp, canFireDepth,
-    mainTargets, secondaryTargets, torpedoTargets, depthTargets,
+    canMove, moveTargets, moveUnit, turnUnit, canTurn,
+    canFireMain, canFireSecondary, canFireTorp, canFireDepth, canFireAA,
+    mainTargets, secondaryTargets, torpedoTargets, depthTargets, aaTargets, aaAttackValue,
     mainAttackInfo, secondaryAttackInfo, torpedoAttackInfo, gunInfo,
-    fireMain, fireSecondary, fireTorpedo, fireDepth,
+    fireMain, fireSecondary, fireTorpedo, fireDepth, fireAA,
     isSubDetected, visibleSubs, unknownSubRows, searchRow, reconRow,
-    strikePathValid, computeCellAA, carrierStrike,
+    strikePathValid, computeCellAA, carrierStrike, combinedCarrierStrike,
+    fighterMoveTargets, moveFighter, fighterAttackShip, fighterAttackAir,
     commandTargets, playCommand,
     applyHp, sinkUnit, checkVictory, finishGame, fleetStrength,
     bearing, arcOf, relativeArc, headingName, sideLabel,
     dist, cellDist, inBounds, forward, backRow, otherSide, roundHalfUp
   };
 });
+
+
+
+
+
+
+
+
 
 
 
@@ -3297,14 +3583,15 @@ button { font-family: inherit; }
 
   function planFor(state, unit, r, c, heading) {
     const fake = Object.assign({}, unit, {
-      r, c, heading,
-      firedMain: false, firedSecondary: false, firedTorp: false, firedDepth: false, launched: false
+      r, c, heading: unit.heading,
+      firedMain: false, firedSecondary: false, firedTorp: false, firedDepth: false, firedAA: false, launched: false
     });
     if (unit.air) {
       const strike = bestStrike(state, fake);
-      return { strike: strike && strike.score > 0 ? strike : null, score: strike && strike.score > 0 ? strike.score : 0, main: null, secondary: null, torp: null, depth: null };
+      return { strike: strike && strike.score > 0 ? strike : null, score: strike && strike.score > 0 ? strike.score : 0, main: null, secondary: null, torps: [], depth: null, aa: null };
     }
-    let main = null, secondary = null, torp = null, depth = null;
+    let main = null, secondary = null, depth = null, aa = null;
+    const torps = [];
     E.mainTargets(state, fake).forEach(t => {
       const info = E.mainAttackInfo(fake, t);
       if (!info || info.final <= 0) return;
@@ -3319,47 +3606,48 @@ button { font-family: inherit; }
       const s = attackValue(t, info.final, 'secondary');
       if (!secondary || s > secondary.score) secondary = { target: t, final: info.final, info, score: s };
     });
-    E.torpedoTargets(state, fake).forEach(t => {
-      const info = E.torpedoAttackInfo(fake, t);
-      const flood = info.final >= 8 ? 2 : 1;
-      const s = attackValue(t, info.final, 'torp') + flood * 8;
-      if (!torp || s > torp.score) torp = { target: t, final: info.final, info, score: s, flood };
+    const torpSides = unit.cls === 'SS' ? ['fore'] : ['port', 'starboard'];
+    torpSides.forEach(side => {
+      E.torpedoTargets(state, fake, side).forEach(t => {
+        const info = E.torpedoAttackInfo(fake, t);
+        const flood = info.final >= 8 ? 2 : 1;
+        const s = attackValue(t, info.final, 'torp') + flood * 8;
+        const existing = torps.find(x => x.side === side);
+        if (!existing || s > existing.score) {
+          const item = { side, target: t, final: info.final, info, score: s, flood };
+          const idx = torps.findIndex(x => x.side === side);
+          if (idx >= 0) torps[idx] = item; else torps.push(item);
+        }
+      });
     });
     E.depthTargets(state, fake).forEach(t => {
       const s = 30 + t.points * 5 + (unit.asw >= t.hp ? 30 : 0);
       if (!depth || s > depth.score) depth = { target: t, final: unit.asw, score: s };
     });
+    E.aaTargets(state, fake).forEach(a => {
+      const s = 18 + a.planes.length * 12;
+      if (!aa || s > aa.score) aa = { targetAir: a, power: E.aaAttackValue(fake), score: s };
+    });
     let score = 0;
-    [main, secondary, torp, depth].forEach(x => { if (x) score += x.score; });
-    if (unit.cls === 'SS' && (torp || depth)) {
+    [main, secondary, depth, aa].forEach(x => { if (x) score += x.score; });
+    torps.forEach(x => { score += x.score; });
+    if (unit.cls === 'SS' && (torps.length || depth)) {
       const asw = state.units.filter(u => u.side !== unit.side && (u.cls === 'DD' || u.cls === 'CVE') && E.dist(u, { r, c }) <= 2).length;
       score -= asw * 10;
     }
-    return { main, secondary, torp, depth, strike: null, score };
+    return { main, secondary, torps, depth, aa, strike: null, score };
   }
 
   function choosePlan(state, unit) {
     const candidates = [];
     const moves = E.moveTargets(state, unit);
     const dests = [{ r: unit.r, c: unit.c, move: false }];
-    moves.forEach(t => {
-      if (unit.cls !== 'SS') {
-        const d = E.cellDist(unit.r, unit.c, t.r, t.c);
-        const max = unit.move + (unit.buffs.move || 0);
-        if (d > max) return;
-        // 远距离只考虑直线，保证移动后的舰首与 AI 评估的朝向一致
-        if (d > 1 && t.r !== unit.r && t.c !== unit.c) return;
-      }
-      dests.push({ r: t.r, c: t.c, move: true });
-    });
+    moves.forEach(t => dests.push({ r: t.r, c: t.c, move: true }));
     dests.forEach(d => {
-      const headings = d.move ? [unit.cls === 'SS' ? unit.heading : E.bearing(unit, d)] : ['N', 'E', 'S', 'W'];
-      headings.forEach(h => {
-        const plan = planFor(state, unit, d.r, d.c, h);
-        const pos = positionScore(state, unit, d.r, d.c);
-        const total = plan.score + pos * 2 - (d.move ? 1 : 0);
-        candidates.push({ r: d.r, c: d.c, heading: h, move: d.move, plan, pos, total });
-      });
+      const plan = planFor(state, unit, d.r, d.c, unit.heading);
+      const pos = positionScore(state, unit, d.r, d.c);
+      const total = plan.score + pos * 2 - (d.move ? 1 : 0);
+      candidates.push({ r: d.r, c: d.c, heading: unit.heading, move: d.move, plan, pos, total });
     });
     candidates.sort((a, b) => b.total - a.total);
     return candidates[0] || null;
@@ -3370,9 +3658,6 @@ button { font-family: inherit; }
     if (choice.move) {
       const r = E.moveUnit(state, unit.uid, choice.r, choice.c);
       if (r.ok) events.push({ type: 'move', unit, result: r });
-    } else if (unit.heading !== choice.heading) {
-      const r = E.turnUnit(state, unit.uid, choice.heading);
-      if (r.ok) events.push({ type: 'turn', unit, result: r });
     }
     const p = choice.plan;
     if (p.main) {
@@ -3387,18 +3672,25 @@ button { font-family: inherit; }
         if (r.ok) events.push({ type: 'secondary', unit, target: t, result: r });
       }
     }
-    if (p.torp) {
-      const t = p.torp.target;
-      if (state.units.includes(t)) {
-        const r = E.fireTorpedo(state, unit.uid, t.uid);
-        if (r.ok) events.push({ type: 'torp', unit, target: t, result: r });
+    (p.torps || []).forEach(torp => {
+      const t = torp.target;
+      if (t && t.hp > 0 && state.units.includes(t)) {
+        const r = E.fireTorpedo(state, unit.uid, t.uid, torp.side);
+        if (r.ok) events.push({ type: 'torp', unit, target: t, side: torp.side, result: r });
       }
-    }
+    });
     if (p.depth) {
       const t = p.depth.target;
       if (state.units.includes(t)) {
         const r = E.fireDepth(state, unit.uid, t.uid);
         if (r.ok) events.push({ type: 'depth', unit, target: t, result: r });
+      }
+    }
+    if (p.aa) {
+      const a = p.aa.targetAir;
+      if (a && state.airUnits.includes(a) && a.planes.length) {
+        const r = E.fireAA(state, unit.uid, a.uid);
+        if (r.ok) events.push({ type: 'aa', unit, targetAir: a, result: r });
       }
     }
     if (p.strike) {
@@ -3600,6 +3892,8 @@ button { font-family: inherit; }
 
 
 
+
+
 </script>
 <script>
 /* ============================================================
@@ -3731,15 +4025,26 @@ button { font-family: inherit; }
     return { x: cr.left - sr.left + cr.width / 2, y: cr.top - sr.top + cr.height / 2 };
   }
   function floodTotal(u) { return u.flood.port + u.flood.starboard; }
-  function hasFired(u) { return u.firedMain || u.firedSecondary || u.firedTorp || u.firedDepth || u.launched; }
-  function canTurn(u) { return u && !u.moved && !hasFired(u); }
+  function hasFired(u) { return u.firedMain || u.firedSecondary || u.firedTorp || u.firedDepth || u.firedAA || u.launched; }
+  function canTurn(u) { return E.canTurn(state, u); }
   function shipStatus(u) {
     const s = [];
+    if (u.justDeployed) s.push('刚部署（本回合不能移动）');
+    if (u.ap < u.apMax) s.push('AP ' + u.ap + '/' + u.apMax);
+    if (u.turnProgress > 0) s.push('转向中 ' + u.turnProgress + '/' + u.turnCost);
+    else if (u.turned) s.push('本轮转向（旧炮位）');
     if (u.moved) s.push('已移动');
     if (hasFired(u)) s.push('已开火');
+    if (u.torpedoState) {
+      if (u.cls === 'SS') {
+        if (u.torpedoState.fore.reload > 0) s.push('舰首鱼雷装填');
+      } else {
+        if (u.torpedoState.port.reload > 0) s.push('左舷鱼雷装填');
+        if (u.torpedoState.starboard.reload > 0) s.push('右舷鱼雷装填');
+      }
+    }
     if (u.fire) s.push('起火 ' + u.fire);
     if (floodTotal(u)) s.push('进水 左' + u.flood.port + '/右' + u.flood.starboard);
-    if (u.reload) s.push('鱼雷装填');
     return s.join(' · ');
   }
 
@@ -4010,16 +4315,14 @@ button { font-family: inherit; }
           }
         }
         const airs = E.airAt(state, r, c);
-        if (airs.length) {
-          const own = airs.filter(a => a.side === human).reduce((n, a) => n + a.planes.length, 0);
-          const enemy = airs.filter(a => a.side !== human).reduce((n, a) => n + a.planes.length, 0);
-          if (own || enemy) {
-            const b = document.createElement('div'); b.className = 'air-badge';
-            b.innerHTML = `<span class="plane-glyph">✈</span>${own || enemy}`;
-            if (enemy && !own) b.style.color = '#f0a0a0';
-            cell.appendChild(b);
-          }
-        }
+        airs.forEach(a => {
+          const el = document.createElement('div');
+          const own = a.side === human;
+          el.className = `air-token ${own ? 'us' : 'jp'} ${view.selectedAirUid === a.uid ? 'sel' : ''}`;
+          el.dataset.airUid = a.uid;
+          el.innerHTML = `<span class="plane-glyph">✈</span><b>${a.planes.length}</b>${a.type === 'F' ? '<i>F</i>' : ''}`;
+          cell.appendChild(el);
+        });
       }
     }
     drawPathLine();
@@ -4035,7 +4338,10 @@ button { font-family: inherit; }
     const badges = [];
     if (u.fire) badges.push(`<span class="sbadge fire">火${u.fire}</span>`);
     if (floodTotal(u)) badges.push(`<span class="sbadge flood">水${floodTotal(u)}</span>`);
-    if (u.reload) badges.push('<span class="sbadge cool">装填</span>');
+    const anyReload = u.torpedoState && Object.values(u.torpedoState).some(st => st.reload > 0);
+    if (anyReload) badges.push('<span class="sbadge cool">雷装填</span>');
+    if (u.turnProgress > 0) badges.push(`<span class="sbadge cool">转${u.turnProgress}/${u.turnCost}</span>`);
+    else if (u.turned) badges.push('<span class="sbadge">转</span>');
     if (u.moved) badges.push('<span class="sbadge">移</span>');
     if (hasFired(u)) badges.push('<span class="sbadge">炮</span>');
     div.innerHTML = `<div class="ship-stripe"></div>
@@ -4056,7 +4362,7 @@ button { font-family: inherit; }
     const div = document.createElement('div');
     div.className = `sub-token ${enemy ? 'enemy' : ''} ${u.exposed ? 'exposed' : ''}`;
     div.dataset.uid = u.uid;
-    div.innerHTML = `<span>潜 ${u.hp}</span><span class="sub-hp"><i style="width:${Math.max(0, u.hp / u.maxHp * 100)}%"></i></span>${u.reload ? '<span class="sub-reload">装填</span>' : ''}`;
+    div.innerHTML = `<span>潜 ${u.hp}</span><span class="sub-hp"><i style="width:${Math.max(0, u.hp / u.maxHp * 100)}%"></i></span>${u.torpedoState && u.torpedoState.fore.reload > 0 ? '<span class="sub-reload">装填</span>' : ''}`;
     return div;
   }
 
@@ -4122,7 +4428,7 @@ button { font-family: inherit; }
             <span>装甲 <b>${def.armor}</b></span>
             <span>防空 <b>${def.aa}</b></span>
             <span>深弹 <b>${def.asw || '—'}</b></span>
-            <span>移动 <b>${def.move}</b></span>
+            <span>行动点 <b>${def.cls === 'DD' ? 2 : 1}</b></span>
           </div>
         </div>
       </div>`;
@@ -4154,14 +4460,27 @@ button { font-family: inherit; }
     const p = state.players[human];
     const sel = view.selectedUid ? E.getUnit(state, view.selectedUid) : null;
     let info = '', buttons = '', phaseBtn = '';
+    const air = view.selectedAirUid ? state.airUnits.find(a => a.uid === view.selectedAirUid) : null;
 
-    if (view.mode === 'deploy' && view.selectedCardUid) {
+    if (air) {
+      const enemyShip = E.surfaceAt(state, air.r, air.c);
+      const enemyAir = state.airUnits.find(a => a.side !== air.side && a.type === 'F' && a.r === air.r && a.c === air.c);
+      info = `<div class="aname">战斗机 ×${air.planes.length} <span style="font-size:9px;color:var(--muted)">AIR PATROL</span></div>
+        <div class="astats">行动力 ${air.ap}/${air.apMax} · 位置 R${air.r}C${air.c} · ${air.attacked ? '本回合已攻击' : '可攻击'}</div>
+        <div class="ahint">移动后飞到敌舰格可永久削减其防空；遇到敌机可缠斗。</div>`;
+      buttons = `
+        <button class="act-btn" data-act="airMove" ${air.ap <= 0 ? 'disabled' : ''}>移动</button>
+        <button class="act-btn" data-act="airAttackShip" ${(!enemyShip || enemyShip.side === air.side || air.attacked || air.ap <= 0) ? 'disabled' : ''}>攻击舰船</button>
+        <button class="act-btn" data-act="airAttackAir" ${(!enemyAir || air.attacked || air.ap <= 0) ? 'disabled' : ''}>空战</button>
+        <button class="act-btn ghost" data-act="cancel">取消</button>`;
+      phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
+    } else if (view.mode === 'deploy' && view.selectedCardUid) {
       const card = p.hand.find(c => c.uid === view.selectedCardUid);
       const def = card && card.kind === 'ship' ? D.SHIP_DEFS[card.defId] : null;
       if (def) {
         info = `<div class="aname">部署 · ${h(def.name)}</div>
           <div class="astats">${def.cls} · ${def.points} 点 · 补给 ${def.cost}</div>
-          <div class="ahint">点击高亮格部署；部署后可立即行动，再次点击手牌取消</div>`;
+          <div class="ahint">点击高亮格部署；刚部署本回合不能移动/转向，但可以开火；再次点击取消</div>`;
       } else {
         info = `<div class="aname">部署</div><div class="ahint">点击高亮格部署。</div>`;
       }
@@ -4177,17 +4496,21 @@ button { font-family: inherit; }
       const canSec = E.canFireSecondary(state, sel) && E.secondaryTargets(state, sel).length > 0;
       const canTorp = E.canFireTorp(state, sel) && E.torpedoTargets(state, sel).length > 0;
       const canDepth = E.canFireDepth(state, sel) && E.depthTargets(state, sel).length > 0;
+      const canAA = E.canFireAA(state, sel) && E.aaTargets(state, sel).length > 0;
       const canStrike = sel.air && sel.air.some(g => g.planes.length) && !sel.launched && !sel.debuffs.dazed;
       const canSearch = (sel.cls === 'DD' || sel.cls === 'CVE') && !sel.searchBoost;
       const canFire = canMain || canSec || canTorp || canDepth;
+      const turnLabel = sel.turnProgress > 0 ? `继续转向 ${sel.turnProgress}/${sel.turnCost}` : '转向';
       info = `<div class="aname">${h(sel.name)} <span style="font-size:9px;color:var(--muted)">${sel.cls} · ${h(D.NATIONS[sel.nation].short)}</span></div>
-        <div class="astats">耐久 ${sel.hp}/${sel.maxHp} · 装甲 ${sel.armor + (sel.buffs.armor || 0)} · 防雷 ${sel.bulkhead + (sel.buffs.bulkhead || 0)} · 深弹 ${sel.asw} · 移动 ${sel.move} · 舰首 ${HEAD_NAME[sel.heading]}</div>
+        <div class="astats">耐久 ${sel.hp}/${sel.maxHp} · 装甲 ${sel.armor + (sel.buffs.armor || 0)} · 防雷 ${sel.bulkhead + (sel.buffs.bulkhead || 0)} · 深弹 ${sel.asw} · 行动点 ${sel.ap}/${sel.apMax} · 舰首 ${HEAD_NAME[sel.heading]}${sel.turnProgress > 0 ? ' · 转向中 ' + sel.turnProgress + '/' + sel.turnCost : ''}</div>
         <div class="ahint">${shipStatus(sel) || '尚未行动'}</div>`;
       buttons = `
         <button class="act-btn" data-act="move" ${!canMove ? 'disabled' : ''}>移动</button>
-        <button class="act-btn" data-act="heading" ${!canTurn(sel) ? 'disabled' : ''}>转向</button>
+        <button class="act-btn" data-act="heading" ${!canTurn(sel) ? 'disabled' : ''}>${turnLabel}</button>
         <button class="act-btn" data-act="fire" ${!canFire ? 'disabled' : ''}>开火</button>
+        <button class="act-btn" data-act="aa" ${!canAA ? 'disabled' : ''}>对空</button>
         <button class="act-btn" data-act="strike" ${!canStrike ? 'disabled' : ''}>出击</button>
+        <button class="act-btn" data-act="combinedStrike" ${(!sel.air || sel.launched) ? 'disabled' : ''}>联合出击</button>
         <button class="act-btn" data-act="search" ${!canSearch ? 'disabled' : ''}>搜索</button>
         <button class="act-btn ghost" data-act="cancel">取消</button>`;
       phaseBtn = `<button class="act-btn gold" data-act="endTurn">结束回合</button>`;
@@ -4200,7 +4523,7 @@ button { font-family: inherit; }
   }
 
   function modeInfoHtml(sel) {
-    if (view.mode === 'move') return `<div class="aname">移动</div><div class="ahint">点击绿色高亮格；移动方向会改变舰首朝向。</div>`;
+    if (view.mode === 'move') return `<div class="aname">移动</div><div class="ahint">只能沿舰首方向前进；每格 1 行动点，不改变舰首。</div>`;
     if (view.mode === 'strike') {
       const n = view.path ? view.path.length : 0;
       const aa = view.aaPreview && view.aaPreview.length ? ` · 防空 ${view.aaPreview.join(' → ')}` : '';
@@ -4247,6 +4570,11 @@ button { font-family: inherit; }
   function onBoardClick(e) {
     if (!state || view.busy) return;
     const cell = e.target.closest('.cell'); if (!cell) return;
+    const airEl = e.target.closest('[data-air-uid]');
+    if (airEl) {
+      if (handlers.onAir) handlers.onAir(parseInt(airEl.dataset.airUid, 10));
+      return;
+    }
     const r = parseInt(cell.dataset.r, 10), c = parseInt(cell.dataset.c, 10);
     const token = e.target.closest('[data-uid]');
     const uid = token ? parseInt(token.dataset.uid, 10) : null;
@@ -4281,10 +4609,11 @@ button { font-family: inherit; }
           <span>舰首</span><b>${HEAD_NAME[u.heading]}</b>
           <span>主炮</span><b>${main}</b>
           <span>副炮</span><b>${sec}</b>
-          <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo : '无'}</b>
-          <span>防空</span><b>${u.aa}</b>
+          <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo + (u.cls === 'SS' ? '（舰首）' : '（左/右舷）') : '无'}</b>
+          <span>鱼雷装填</span><b>${u.torpedoState ? (u.cls === 'SS' ? (u.torpedoState.fore.reload > 0 ? '舰首装填中' : '舰首就绪') : '左' + (u.torpedoState.port.reload > 0 ? '装填' : '就绪') + ' / 右' + (u.torpedoState.starboard.reload > 0 ? '装填' : '就绪')) : '无'}</b>
+          <span>防空</span><b>${Math.max(0, u.aa - (u.aaDown || 0))}${u.aaDown ? '（永久 -' + u.aaDown + '）' : ''}</b>
           <span>深弹</span><b>${u.asw || '无'}</b>
-          <span>移动</span><b>${u.move}</b>
+          <span>行动点</span><b>${u.ap}/${u.apMax}${u.turnProgress > 0 ? '（转向 ' + u.turnProgress + '/' + u.turnCost + '）' : ''}</b>
           <span>装甲</span><b>${u.armor}（炮火减伤）</b>
           <span>防雷隔舱</span><b>${u.bulkhead}（鱼雷减伤）</b>
           <span>起火</span><b>${u.fire}</b>
@@ -4309,7 +4638,7 @@ button { font-family: inherit; }
             <span>防空</span><b>${def.aa}</b>
             <span>深弹</span><b>${def.asw || '无'}</b>
             <span>防雷</span><b>${def.bulkhead}</b>
-            <span>移动</span><b>${def.move}</b>
+            <span>行动点</span><b>${def.cls === 'DD' ? 2 : 1}</b>
           </div>
           <div class="tt-desc">${h(def.flavor || '')}${def.air ? '<br>舰载机：' + Object.entries(def.air).map(([k, v]) => `${k}×${v}`).join(' · ') : ''}</div>`;
       } else {
@@ -4579,24 +4908,24 @@ button { font-family: inherit; }
       <h2>0 · 战场与目标</h2>
       <p>战场为 <b>6 条横线（R0–R5）× 5 个纵格（C0–C4）</b>。A 方（玩家）从 R0 向 R5 推进，B 方（AI）相反。R0/R5 是后方，中间四条线是中立前线，不显示归属。</p>
       <p>一局 16 轮。每轮双方各一个回合。轮末比较击沉点数；一方无舰可战则立即判负。</p>
-      <h2>1 · 回合与补给</h2>
-      <p>每回合开始：补给上限在本轮提高（第 1 轮 <b>1</b>，第 2 轮 2，之后每轮 +1，最高 10），补给<b>回满到上限</b>；然后抽 1 张牌。部署与行动合并：本回合可以随时部署舰船、指挥已部署舰船行动、使用指令，最后结束回合。</p>
-      <h2>2 · 朝向与射界</h2>
-      <p>每艘舰船有舰首方向（北/东/南/西）。主炮、副炮按<b>前/后/左/右</b>四个射界的炮管数计算伤害；例如 3×3 主炮的战列舰，侧舷 9 门、前方 6 门、后方 3 门。移动会将舰首转向移动方向；未移动时可在开火前自由转向一次。</p>
+      <h2>1 · 回合、补给与行动点</h2>
+      <p>每回合开始：补给上限在本轮提高（第 1 轮 <b>1</b>，第 2 轮 2，之后每轮 +1，最高 10），补给<b>回满到上限</b>；然后抽 1 张牌。部署与行动合并：随时在<b>最后线</b>部署舰船、指挥舰船、使用指令，最后结束回合。刚部署的舰船当回合<b>不能移动/转向，但可以开火/出击</b>。每艘舰每回合刷新<b>行动点</b>：驱逐舰 <b>2</b>，其他舰 <b>1</b>；开火和航母出击不消耗行动点。</p>
+      <h2>2 · 朝向、移动与转向</h2>
+      <p>每艘舰船有舰首方向（北/东/南/西）。<b>只能朝舰首方向前进</b>，每格消耗 <b>1 行动点</b>；移动不改变舰首。转向：驱逐/巡洋/潜艇消耗 <b>1 AP</b>；战列舰/航母消耗 <b>3 AP</b>，所以通常要跨 3 个回合完成。可以先移动，再用剩余 AP 转向；<b>转向后不能再移动</b>，但可以开火，开火按<b>转向前的炮位</b>结算。转向完成后的下一个回合才按新舰首开火。主炮、副炮按前/后/左/右的炮管数计算伤害。</p>
       <h2>3 · 主炮与副炮</h2>
       <p>主炮和副炮可以<b>分别选择不同目标</b>并同时开火。主炮伤害按可用炮管数 / 最大炮管数折算；副炮射程 2，专门对付驱逐舰等轻型舰船。装甲每层使每次炮击伤害 -1（副炮可被完全挡下）；鱼雷伤害被防鱼雷隔舱每层 -1。</p>
       <h2>4 · 起火与进水</h2>
       <p><b>起火</b>：每层每回合造成 2 点伤害。<b>进水</b>：每层每回合造成 1 点伤害；分左舷/右舷，左右差超过 3 时立即倾覆沉没。主炮/炸弹大伤害会引发起火，鱼雷会在命中侧造成进水。损管指令可以移除。</p>
       <h2>5 · 航空</h2>
-      <p>航母每回合可移动后出击一次；航程 <b>6 格</b>，逐格规划航路，逐格结算防空（目标格及相邻 1.0，其余 0.5，每架每回合最多 3 点）。鱼雷机造成进水，俯冲轰炸机造成起火；战斗机可缠斗/压制/护航。</p>
-      <h2>6 · 潜艇与深弹</h2>
-      <p>潜艇隐藏在水下；敌方 DD/CVE/SS 同线被动发现，DD/CVE 主动搜索、舰队侦察可揭示。鱼雷攻击后暴露到己方下回合；潜艇鱼雷需要一回合装填。<b>驱逐舰深弹伤害 6</b>，潜艇只有 6–7 耐久：两艘驱逐舰一轮就能击沉一艘潜艇；潜艇移动力降为 1，驱逐舰移动力 2。</p>
+      <p>航母每回合可移动后出击一次；航程 <b>6 格</b>。单航母出击逐格结算防空；多艘航母可以<b>联合出击</b>，不同航母/机型混编，所有机队对同一目标<b>只承受一次防空</b>。战斗机出击后<b>留在战场</b>，每回合刷新 <b>6 行动力</b>，可飞过去攻击敌舰使其防空<b>永久降低</b>，也可与敌机缠斗；敌机经过战斗机所在格会掉血。舰船自身也可用<b>防空炮</b>射击射程 1 内的敌方战斗机（单独「对空」按钮，每舰每回合一次，不影响对海开火）。</p>
+      <h2>6 · 鱼雷、潜艇与深弹</h2>
+      <p>水面舰鱼雷分<b>左舷 / 右舷</b>，只能攻击对应侧舷的目标，不能向船头/船尾发射；左右两侧的装填与发射完全独立。驱逐舰等水面舰发射后该侧需要 <b>1 回合装填</b>。<b>潜艇只有舰首鱼雷</b>，目标必须在潜艇舰首方向；发射后暴露并装填 1 回合。敌方 DD/CVE/SS 同线被动发现，DD/CVE 主动搜索、舰队侦察可揭示。<b>驱逐舰深弹伤害 6</b>，潜艇只有 6–7 耐久：两艘驱逐舰一轮就能击沉一艘潜艇。</p>
       <h2>7 · 牌组</h2>
       <p>盟军：美/英/法/苏/意；轴心：德/日/意。意大利卡可加入任一阵营。自由牌组：舰船吨位 ≤120 点，主力舰（BB+CV）≤60 点，同名 ≤2，潜艇 ≤1，指令 ≤8，至少 8 艘舰船，总卡 ≤30。AI 使用对方阵营固定牌组。</p>
       <h2>8 · 指令卡</h2>
       <p>指令卡不占吨位，每回合限 1 张，随时可用；每张指令有 <b>1–3 费</b>的补给费用，和部署抢补给。效果包括修理、装甲、防空、鱼雷/主炮强化、直接伤害、起火/进水、禁移动/禁攻击、抽牌、补给、侦察、补充舰载机等。</p>
       <h2>9 · 手机操作</h2>
-      <p>单击舰船 = 选中 / 移动 / 开火；<b>双击舰船</b> = 打开完整舰船介绍。手牌里的舰船：单击选中部署，<b>双击查看介绍</b>；指令卡单击使用。</p>
+      <p>单击舰船 = 选中 / 移动 / 开火；<b>双击舰船</b> = 打开完整舰船介绍。手牌里的舰船：单击选中部署，<b>双击查看介绍</b>；指令卡单击使用。点击场上的<b>战斗机标记</b>可移动/攻击/缠斗。</p>
       <div class="rp-note">实现说明：四向射界用主方向判定（斜向取行列差较大的方向）；主炮/副炮分别独立开火；起火/进水在舰船所有者回合开始时结算；潜艇鱼雷装填 1 回合；补给回满机制参考 KARDS 指挥点。第 9 章“特性”未实现。</div>
     </div>`;
     document.getElementById('modalRoot').appendChild(wrap);
@@ -4627,7 +4956,7 @@ button { font-family: inherit; }
         <span>副炮</span><b>${sec}</b>
         <span>鱼雷</span><b>${def.torpedo ? '伤害 ' + def.torpedo : '无'}</b>
         <span>深弹</span><b>${def.asw || '无'}</b>
-        <span>移动</span><b>${def.move}</b>
+        <span>行动点</span><b>${def.cls === 'DD' ? 2 : 1}</b>
         <span>防空</span><b>${def.aa}</b>
         <span>装甲</span><b>${def.armor}（炮火减伤）</b>
         <span>防雷隔舱</span><b>${def.bulkhead}（鱼雷减伤）</b>
@@ -4660,10 +4989,11 @@ button { font-family: inherit; }
         <span>舰首</span><b>${HEAD_NAME[u.heading]}</b>
         <span>主炮</span><b>${main}</b>
         <span>副炮</span><b>${sec}</b>
-        <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo : '无'}</b>
+        <span>鱼雷</span><b>${u.torpedo ? '伤害 ' + u.torpedo + (u.cls === 'SS' ? '（舰首）' : '（左/右舷）') : '无'}</b>
+        <span>鱼雷装填</span><b>${u.torpedoState ? (u.cls === 'SS' ? (u.torpedoState.fore.reload > 0 ? '舰首装填中' : '舰首就绪') : '左' + (u.torpedoState.port.reload > 0 ? '装填' : '就绪') + ' / 右' + (u.torpedoState.starboard.reload > 0 ? '装填' : '就绪')) : '无'}</b>
         <span>深弹</span><b>${u.asw || '无'}</b>
-        <span>移动</span><b>${u.move}</b>
-        <span>防空</span><b>${u.aa}</b>
+        <span>行动点</span><b>${u.ap}/${u.apMax}${u.turnProgress > 0 ? '（转向 ' + u.turnProgress + '/' + u.turnCost + '）' : ''}</b>
+        <span>防空</span><b>${Math.max(0, u.aa - (u.aaDown || 0))}${u.aaDown ? '（永久 -' + u.aaDown + '）' : ''}</b>
         <span>装甲</span><b>${u.armor}（炮火减伤）</b>
         <span>防雷隔舱</span><b>${u.bulkhead}（鱼雷减伤）</b>
         <span>起火</span><b>${u.fire}</b>
@@ -4718,15 +5048,22 @@ button { font-family: inherit; }
     }
     addRow('main', '主炮', E.mainTargets(state, unit), t => E.mainAttackInfo(unit, t));
     addRow('secondary', '副炮', E.secondaryTargets(state, unit), t => E.secondaryAttackInfo(unit, t));
-    addRow('torp', '鱼雷', E.torpedoTargets(state, unit), t => { const i = E.torpedoAttackInfo(unit, t); return { final: i.final, arc: '鱼雷', barrels: '', max: '' }; });
+    const torpInfo = t => { const i = E.torpedoAttackInfo(unit, t); return { final: i.final, arc: '鱼雷', barrels: '', max: '' }; };
+    if (unit.cls === 'SS') {
+      addRow('torpFore', '舰首鱼雷', E.torpedoTargets(state, unit, 'fore'), torpInfo);
+    } else if (unit.torpedo) {
+      addRow('torpPort', '左舷鱼雷', E.torpedoTargets(state, unit, 'port'), torpInfo);
+      addRow('torpStarboard', '右舷鱼雷', E.torpedoTargets(state, unit, 'starboard'), torpInfo);
+    }
     addRow('depth', '深弹', E.depthTargets(state, unit), t => ({ final: unit.asw, arc: '深弹', barrels: '', max: '' }));
     if (!rows.length) { toast('没有可开火的目标'); return; }
+    const fightHeading = (unit.turnPreHeading && (unit.turned || unit.turnProgress > 0)) ? unit.turnPreHeading : unit.heading;
     const wrap = document.createElement('div');
     wrap.className = 'modal-wrap show';
     wrap.innerHTML = `<div class="fire-panel">
       <div class="end-kicker">FIRE CONTROL</div>
       <div class="fire-title">${h(unit.name)} · 开火</div>
-      <div class="fire-sub">舰首 ${HEAD_NAME[unit.heading]} · 主炮 ${unit.main ? unit.main.damage : '—'} · 副炮 ${unit.secondary ? unit.secondary.damage : '—'} · 装甲 ${unit.armor}</div>
+      <div class="fire-sub">射击朝向 ${HEAD_NAME[fightHeading]}${(unit.turned || unit.turnProgress > 0) ? '（转向前炮位）' : ''} · 主炮 ${unit.main ? unit.main.damage : '—'} · 副炮 ${unit.secondary ? unit.secondary.damage : '—'} · 装甲 ${unit.armor}</div>
       <div class="fire-rows">${rows.join('')}</div>
       <div class="fire-actions"><button class="act-btn ghost" data-close="1">取消</button><button class="act-btn gold" data-fire="1">开火</button></div>
     </div>`;
@@ -4743,13 +5080,76 @@ button { font-family: inherit; }
     });
   }
 
+  function openAntiAirPanel(unit, targets, onConfirm) {
+    if (!targets || !targets.length) { toast('射程内没有敌方战斗机'); return; }
+    const power = E.aaAttackValue(unit);
+    const opts = targets.map(a => `<option value="${a.uid}">敌战斗机 ×${a.planes.length} · R${a.r}C${a.c} — 击落 ${power}</option>`).join('');
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap show';
+    wrap.innerHTML = `<div class="fire-panel" style="width:min(440px,92vw)">
+      <div class="end-kicker">ANTI-AIR</div>
+      <div class="fire-title">${h(unit.name)} · 对空射击</div>
+      <div class="fire-sub">射程 1，仅目标敌方战斗机；不占用对海开火。</div>
+      <div class="fire-row"><label>目标</label><select class="aa-target">${opts}</select></div>
+      <div class="fire-actions"><button class="act-btn ghost" data-close="1">取消</button><button class="act-btn gold" data-aa="1">射击</button></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(wrap);
+    modalEl = wrap;
+    wrap.addEventListener('click', e => {
+      if (e.target === wrap || e.target.dataset.close) { closeModal(); return; }
+      if (e.target.closest('[data-aa]')) {
+        const uid = parseInt(wrap.querySelector('.aa-target').value, 10);
+        closeModal(); onConfirm(uid);
+      }
+    });
+  }
+
+  function openCombinedStrikePanel(state, side, onConfirm) {
+    const carriers = E.unitsOf(state, side).filter(u => u.air && !u.launched);
+    const enemies = state.units.filter(u => u.side !== side && u.cls !== 'SS');
+    if (!carriers.length || !enemies.length) { toast('没有可联合出击的航母或目标'); return; }
+    const rows = carriers.map(u => {
+      const groups = (u.air || []).filter(g => g.planes.length);
+      if (!groups.length) return '';
+      return `<div class="combined-carrier"><div class="combined-name">${h(u.name)} <span>R${u.r}C${u.c}</span></div>
+        ${groups.map(g => `<label class="combined-group"><input type="checkbox" data-carrier="${u.uid}" data-type="${g.type}" checked> ${g.type} ×${g.planes.length}</label>`).join('')}
+      </div>`;
+    }).join('');
+    const opts = enemies.map(t => `<option value="${t.uid}">${h(D.NATIONS[t.nation].short)}「${h(t.name)}」 ${t.hp}/${t.maxHp} · R${t.r}C${t.c}</option>`).join('');
+    const wrap = document.createElement('div');
+    wrap.className = 'modal-wrap show';
+    wrap.innerHTML = `<div class="fire-panel combined-panel">
+      <div class="end-kicker">COMBINED STRIKE</div>
+      <div class="fire-title">联合出击 · 多航母混编</div>
+      <div class="fire-sub">所有选中机队只承受一次目标格防空；不同航母/机型可混合。</div>
+      <div class="combined-list">${rows}</div>
+      <div class="fire-row"><label>目标</label><select class="combined-target">${opts}</select></div>
+      <div class="fire-actions"><button class="act-btn ghost" data-close="1">取消</button><button class="act-btn gold" data-combined="1">出击</button></div>
+    </div>`;
+    document.getElementById('modalRoot').appendChild(wrap);
+    modalEl = wrap;
+    wrap.addEventListener('click', e => {
+      if (e.target === wrap || e.target.dataset.close) { closeModal(); return; }
+      if (e.target.closest('[data-combined]')) {
+        const picks = [];
+        wrap.querySelectorAll('input[data-carrier]:checked').forEach(cb => {
+          picks.push({ carrierUid: parseInt(cb.dataset.carrier, 10), type: cb.dataset.type });
+        });
+        const targetUid = parseInt(wrap.querySelector('.combined-target').value, 10);
+        if (!picks.length) { toast('至少选择一个机队'); return; }
+        closeModal();
+        onConfirm(picks, targetUid);
+      }
+    });
+  }
+
   function openHeadingPanel(unit, onConfirm) {
     const wrap = document.createElement('div');
     wrap.className = 'modal-wrap show';
     wrap.innerHTML = `<div class="end-card" style="width:min(420px,90vw)">
       <div class="end-kicker">HEADING</div>
       <div style="font-family:var(--serif);font-size:24px;color:var(--gold-2);margin:8px 0 6px">${h(unit.name)} · 转向</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:14px">当前舰首：${HEAD_NAME[unit.heading]}。转向后本回合仍可移动/开火；移动会再次改变舰首。</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:14px">当前舰首：${HEAD_NAME[unit.heading]}。转向消耗 ${unit.turnCost} 行动点（当前 ${unit.ap}/${unit.apMax}）；转向后本回合只能开火、不能移动，开火按转向前的炮位结算。</div>
       <div class="heading-grid">
         <button class="act-btn" data-head="N">↑ 北</button>
         <button class="act-btn" data-head="W">← 西</button>
@@ -4951,13 +5351,26 @@ button { font-family: inherit; }
   /* ---------------- 导出 ---------------- */
   window.UI = {
     init, render, resetLog, showStart, hideOverlay, showEnd, showRules,
-    showDeckBuilder, closeModal, pickSquadron, confirmBox, openFirePanel, openHeadingPanel, showInfoPanel, showShipInfo, showCardInfo,
+    showDeckBuilder, closeModal, pickSquadron, confirmBox, openFirePanel, openAntiAirPanel, openHeadingPanel, openCombinedStrikePanel, showInfoPanel, showShipInfo, showCardInfo,
     toast, playEvent, Sound,
     get soundOn() { return soundOn; },
     setSpeed(f) { fast = !!f; },
     hideTooltip
   };
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4994,6 +5407,7 @@ button { font-family: inherit; }
     decks: { Allies: D.cloneDeck(D.STARTER_DECKS.Allies), Axis: D.cloneDeck(D.STARTER_DECKS.Axis) },
     selectedUid: null,
     selectedCardUid: null,
+    selectedAirUid: null,
     mode: null,
     airType: null,
     airCarrierUid: null,
@@ -5033,6 +5447,7 @@ button { font-family: inherit; }
     const v = {
       humanSide: app.human, busy: app.busy || app.aiScheduled,
       selectedUid: app.selectedUid, selectedCardUid: app.selectedCardUid,
+      selectedAirUid: app.selectedAirUid,
       mode: app.mode, airType: app.airType, airCarrierUid: app.airCarrierUid,
       path: app.path.slice(), validCells: [], targetUids: [], reconRows: [],
       strikeTargetOk: false
@@ -5040,7 +5455,10 @@ button { font-family: inherit; }
     if (!app.state) return v;
     const s = app.state;
     const p = s.players[app.human];
-    if (app.mode === 'deploy' && app.selectedCardUid) {
+    if (app.mode === 'airMove' && app.selectedAirUid) {
+      const a = s.airUnits.find(x => x.uid === app.selectedAirUid);
+      if (a) v.validCells = E.fighterMoveTargets(s, a).map(c => key(c.r, c.c));
+    } else if (app.mode === 'deploy' && app.selectedCardUid) {
       const card = p.hand.find(c => c.uid === app.selectedCardUid);
       if (card && card.kind === 'ship') v.validCells = E.deployCells(s, app.human, card).map(c => key(c.r, c.c));
     } else if (app.mode === 'move' && app.selectedUid) {
@@ -5081,7 +5499,7 @@ button { font-family: inherit; }
   function render() { UI.render(app.state, makeView()); }
 
   function clearSelection() {
-    app.selectedUid = null; app.selectedCardUid = null; app.mode = null;
+    app.selectedUid = null; app.selectedCardUid = null; app.selectedAirUid = null; app.mode = null;
     app.airType = null; app.airCarrierUid = null; app.path = [];
   }
 
@@ -5162,6 +5580,14 @@ button { font-family: inherit; }
     if (!s || app.busy || app.aiScheduled || s.finished) return;
     if (s.active !== app.human) return;
 
+    if (app.mode === 'airMove') {
+      const a = s.airUnits.find(x => x.uid === app.selectedAirUid); if (!a) return;
+      const res = E.moveFighter(s, a.uid, r, c);
+      if (!res.ok) { UI.toast(res.error); return; }
+      app.mode = null;
+      await UI.playEvent({ type: 'airMove', air: a, result: res });
+      render(); return;
+    }
     if (app.mode === 'deploy') {
       if (!app.selectedCardUid) return;
       const res = E.deploy(s, app.selectedCardUid, r, c);
@@ -5202,7 +5628,7 @@ button { font-family: inherit; }
     if (uid) {
       const u = E.getUnit(s, uid);
       if (u && u.side === app.human) {
-        app.selectedUid = u.uid; app.selectedCardUid = null; app.mode = null; render(); return;
+        app.selectedUid = u.uid; app.selectedCardUid = null; app.selectedAirUid = null; app.mode = null; render(); return;
       }
     }
     clearSelection(); render();
@@ -5215,7 +5641,7 @@ button { font-family: inherit; }
     const card = p.hand.find(c => c.uid === uid); if (!card) return;
     if (card.kind === 'ship') {
       if (app.selectedCardUid === uid) { app.selectedCardUid = null; app.mode = null; }
-      else { app.selectedCardUid = uid; app.selectedUid = null; app.mode = 'deploy'; }
+      else { app.selectedCardUid = uid; app.selectedUid = null; app.selectedAirUid = null; app.mode = 'deploy'; }
       render(); return;
     }
     if (p.commandUsed) { UI.toast('本回合已经使用过指令卡'); return; }
@@ -5230,7 +5656,7 @@ button { font-family: inherit; }
     }
     const targets = E.commandTargets(s, app.human, cmd);
     if (!targets.length) { UI.toast('没有适用目标'); return; }
-    app.selectedCardUid = uid; app.selectedUid = null; app.mode = 'command'; render();
+    app.selectedCardUid = uid; app.selectedUid = null; app.selectedAirUid = null; app.mode = 'command'; render();
   }
 
   async function onAction(act) {
@@ -5255,12 +5681,55 @@ button { font-family: inherit; }
     }
     if (act === 'recon') {
       if (s.players[app.human].reconUsed) { UI.toast('本回合已经侦察过'); return; }
-      app.mode = 'recon'; app.selectedUid = null; render(); return;
+      app.mode = 'recon'; app.selectedUid = null; app.selectedAirUid = null; render(); return;
+    }
+    if (act === 'airMove' || act === 'airAttackShip' || act === 'airAttackAir') {
+      const a = s.airUnits.find(x => x.uid === app.selectedAirUid);
+      if (!a) { UI.toast('请先选择一架战斗机'); return; }
+      if (act === 'airMove') { app.mode = 'airMove'; render(); return; }
+      if (act === 'airAttackShip') {
+        const t = E.surfaceAt(s, a.r, a.c);
+        if (!t || t.side === a.side) { UI.toast('当前格没有敌方水面舰'); return; }
+        const res = E.fighterAttackShip(s, a.uid, t.uid);
+        if (!res.ok) UI.toast(res.error);
+        render(); return;
+      }
+      const t = s.airUnits.find(x => x.side !== a.side && x.type === 'F' && x.r === a.r && x.c === a.c);
+      if (!t) { UI.toast('当前格没有敌方战斗机'); return; }
+      const res = E.fighterAttackAir(s, a.uid, t.uid);
+      if (!res.ok) UI.toast(res.error);
+      render(); return;
+    }
+    if (act === 'combinedStrike') {
+      const carrier = E.getUnit(s, app.selectedUid);
+      if (!carrier || !carrier.air) { UI.toast('请先选择一艘航母'); return; }
+      UI.openCombinedStrikePanel(s, app.human, (picks, targetUid) => {
+        const res = E.combinedCarrierStrike(s, picks, targetUid);
+        if (!res.ok) { UI.toast(res.error); return; }
+        render();
+      });
+      return;
     }
     const u = E.getUnit(s, app.selectedUid);
     if (!u) { UI.toast('请先选择一艘己方舰船'); return; }
+    if (act === 'aa') {
+      const targets = E.aaTargets(s, u);
+      if (!targets.length) { UI.toast('射程内没有敌方战斗机'); return; }
+      UI.openAntiAirPanel(u, targets, targetUid => {
+        const res = E.fireAA(s, u.uid, targetUid);
+        if (!res.ok) UI.toast(res.error);
+        render();
+      });
+      return;
+    }
     if (act === 'move') { app.mode = 'move'; app.path = []; render(); return; }
     if (act === 'heading') {
+      if (u.turnProgress > 0 && u.turnTarget) {
+        const r = E.turnUnit(s, u.uid, u.turnTarget);
+        if (!r.ok) UI.toast(r.error);
+        render();
+        return;
+      }
       UI.openHeadingPanel(u, heading => {
         const r = E.turnUnit(s, u.uid, heading);
         if (!r.ok) UI.toast(r.error);
@@ -5314,14 +5783,15 @@ button { font-family: inherit; }
         else UI.toast(r.error);
       }
     }
-    if (sel.torp) {
-      const t = E.getUnit(s, sel.torp);
+    [['torpPort', 'port'], ['torpStarboard', 'starboard'], ['torpFore', 'fore']].forEach(([key, side]) => {
+      if (!sel[key]) return;
+      const t = E.getUnit(s, sel[key]);
       if (t && t.hp > 0) {
-        const r = E.fireTorpedo(s, unit.uid, t.uid);
-        if (r.ok) events.push({ type: 'torp', unit, target: t, result: r });
+        const r = E.fireTorpedo(s, unit.uid, t.uid, side);
+        if (r.ok) events.push({ type: 'torp', unit, target: t, side, result: r });
         else UI.toast(r.error);
       }
-    }
+    });
     if (sel.depth) {
       const t = E.getUnit(s, sel.depth);
       if (t && t.hp > 0) {
@@ -5342,7 +5812,15 @@ button { font-family: inherit; }
     const s = app.state;
     if (!s || app.busy || app.aiScheduled || s.finished || s.active !== app.human) return;
     const u = E.getUnit(s, uid); if (!u || u.side !== app.human) return;
-    app.selectedUid = uid; app.selectedCardUid = null; app.mode = null; render();
+    app.selectedUid = uid; app.selectedCardUid = null; app.selectedAirUid = null; app.mode = null; render();
+  }
+
+  function onAir(uid) {
+    const s = app.state;
+    if (!s || app.busy || app.aiScheduled || s.finished || s.active !== app.human) return;
+    const a = s.airUnits.find(x => x.uid === uid);
+    if (!a || a.side !== app.human) return;
+    app.selectedAirUid = uid; app.selectedUid = null; app.selectedCardUid = null; app.mode = null; render();
   }
 
   function onCancel() {
@@ -5403,6 +5881,7 @@ button { font-family: inherit; }
       onInfo: () => UI.showInfoPanel(),
       onShipInfo: uid => UI.showShipInfo(uid),
       onCardInfo: uid => UI.showCardInfo(uid),
+      onAir: uid => onAir(uid),
       onSide: side => { app.playerSide = side; UI.showStart(app.decks, side); }
     });
     UI.setSpeed(app.speed > 1);
@@ -5438,6 +5917,8 @@ button { font-family: inherit; }
       document.body.appendChild(el);
     }, 1200);
   }
+
+
 
 
 
