@@ -1392,6 +1392,115 @@ button { font-family: inherit; }
 .air-token b { font-size: 10px; }
 .air-token i { font-style: normal; font-size: 8px; opacity: .7; }
 
+.combined-type { width: 100%; margin-top: 6px; height: 28px; background: rgba(6,14,22,.9); color: var(--ink); border: 1px solid var(--line); border-radius: 3px; font-size: 10px; }
+
+/* ---------------- 手机横屏 ---------------- */
+@media (orientation: landscape) and (max-width: 1000px) and (max-height: 540px) {
+  html, body { overflow: hidden; height: 100%; }
+  .app { height: 100dvh; min-height: 0; min-width: 0; overflow: hidden; }
+  .topbar {
+    height: 32px; flex: 0 0 32px; flex-wrap: nowrap;
+    padding: 2px max(6px, env(safe-area-inset-left)) 2px max(6px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+  .brand { min-width: 0; flex: 0 0 auto; gap: 4px; }
+  .brand-mark { width: 19px; height: 19px; }
+  .brand-text h1 { font-size: 12px; letter-spacing: 0.1em; }
+  .brand-text p { display: none; }
+  .status-strip { order: initial; flex: 1 1 auto; flex-basis: auto; height: auto; gap: 2px; justify-content: center; overflow: hidden; }
+  .status-pill { padding: 2px 4px; font-size: 6.5px; gap: 2px; white-space: nowrap; }
+  .status-pill b { font-size: 8px; }
+  .top-actions { gap: 2px; flex: 0 0 auto; }
+  .top-actions .icon-btn { height: 22px; padding: 0 4px; font-size: 7.5px; }
+  .top-actions .icon-btn.mobile-only { display: inline-block; }
+  .layout { display: block; flex: 1 1 auto; min-height: 0; padding: 2px 4px; }
+  .side.left, .side.right { display: none; }
+  .center { height: 100%; max-width: none; width: 100%; display: grid; grid-template-rows: 12px minmax(0, 1fr) auto; gap: 2px; }
+  .phase-banner { flex-basis: 12px; height: 12px; font-size: 6.5px; letter-spacing: 0.04em; }
+  :root {
+    --row-label: 22px;
+    --cell-w: clamp(34px, calc((100vw - 56px) / 5), 58px);
+    --cell-h: clamp(23px, calc((100dvh - 172px) / 6), 40px);
+  }
+  .board-shell { width: auto; max-width: 100%; height: 100%; padding: 2px 4px 3px; align-self: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+  .board-head, .row { grid-template-columns: var(--row-label) repeat(5, var(--cell-w)); }
+  .board-head { height: 10px; margin-bottom: 1px; }
+  .board-head .col-label { font-size: 4.5px; letter-spacing: 0.1em; }
+  .row-label { padding: 0 1px; }
+  .row-label .rname { font-size: 6.5px; }
+  .row-label .rzone { font-size: 4px; letter-spacing: 0; }
+  .row-label .subhint { display: none; }
+  .cell .coord { display: none; }
+  .ship-token { inset: 1px; }
+  .ship-svg { flex-basis: 12px; width: 12px; }
+  .ship-name { font-size: 6.5px; }
+  .ship-class { font-size: 4px; }
+  .ship-hp .num { font-size: 4.5px; }
+  .ship-badges { top: 0; right: 0; gap: 0; }
+  .sbadge { font-size: 3.8px; padding: 0 1px; }
+  .sub-token { width: 17px; height: 13px; left: 1px; bottom: 1px; font-size: 4.5px; }
+  .air-token { right: 2px; top: 2px; padding: 1px 3px; font-size: 5.5px; }
+  .air-token b { font-size: 6px; }
+  .action-bar { min-height: 40px; padding: 3px 5px; flex-wrap: nowrap; gap: 4px; overflow-x: auto; overflow-y: hidden; }
+  .action-info { width: auto; flex: 1 1 auto; min-width: 0; }
+  .action-info .aname { font-size: 9px; }
+  .action-info .astats, .action-info .ahint { font-size: 6.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .action-buttons { gap: 2px; width: auto; flex: 0 0 auto; }
+  .act-btn { height: 24px; padding: 0 5px; font-size: 7.5px; }
+  .phase-action { margin-left: 0; width: auto; justify-content: flex-end; flex: 0 0 auto; }
+  .hand-dock { flex: 0 0 76px; padding: 1px max(4px, env(safe-area-inset-left)) 2px max(4px, env(safe-area-inset-right)); }
+  .hand-head { height: 11px; font-size: 6px; }
+  .hand { height: 60px; gap: 3px; padding-bottom: 2px; }
+  .hcard { flex-basis: 92px; height: 56px; }
+  .hcard .hc-name { font-size: 9px; }
+  .hcard .hc-cost { width: 12px; height: 12px; font-size: 6.5px; left: 2px; top: 2px; }
+  .hcard .hc-class { left: 16px; top: 3px; font-size: 4.5px; }
+  .hcard .hc-points { font-size: 5px; right: 2px; top: 2px; }
+  .hcard .hc-body { padding: 14px 3px 1px; }
+  .hcard .hc-stats { font-size: 5.2px; gap: 0 2px; }
+  .hcard .hc-sub { font-size: 4.8px; }
+  .hcard .hc-effect { font-size: 5.2px; line-height: 1.3; }
+  .toast { bottom: 80px; }
+  /* 标题 / 牌组编辑器在横屏下用左右两栏 */
+  .start-wrap { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr); width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; gap: 16px; padding: 10px 18px; overflow-y: auto; }
+  .start-left, .start-right { display: block; width: auto; min-width: 0; max-width: 100%; }
+  .start-title { font-size: 38px; letter-spacing: 0.05em; }
+  .start-desc { max-width: 100%; font-size: 9px; line-height: 1.65; }
+  .start-actions { gap: 5px; margin-top: 12px; flex-wrap: wrap; }
+  .big-btn { height: 32px; padding: 0 11px; font-size: 10px; }
+  .start-footer { gap: 6px 14px; margin-top: 10px; padding-top: 8px; }
+  .start-footer b { font-size: 14px; }
+  .start-footer span { font-size: 6.5px; }
+  .start-watermark { width: 220px; height: 220px; right: -50px; bottom: -40px; }
+  .fleet-pick { padding: 9px 10px; }
+  .fp-name { font-size: 12px; }
+  .fp-pts { font-size: 15px; }
+  .fp-ships { gap: 3px; }
+  .fp-chip { font-size: 6px; }
+  .builder-panel { width: 100vw; height: 100dvh; border-radius: 0; }
+  .builder-head { padding: 7px 10px 5px; gap: 4px; flex-wrap: wrap; }
+  .builder-title { font-size: 15px; }
+  .builder-totals { gap: 7px; }
+  .builder-totals b { font-size: 13px; }
+  .builder-body { grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr); }
+  .builder-pool { max-height: calc(100dvh - 84px); border-right: 1px solid var(--line); border-bottom: none; }
+  .builder-deck { max-height: calc(100dvh - 84px); padding: 6px 8px; }
+  .builder-deck-list { max-height: 86px; }
+  .fire-panel { width: min(520px, 72vw); max-height: 92dvh; overflow-y: auto; padding: 12px 14px; }
+  .fire-title { font-size: 18px; }
+  .fire-row { grid-template-columns: 40px 1fr; gap: 5px; }
+  .fire-select { font-size: 8.5px; height: 28px; }
+  .fire-actions .act-btn { height: 28px; }
+  .rules-paper { max-height: 94dvh; padding: 16px 18px 22px; }
+  .rules-paper h1 { font-size: 20px; }
+  .info-panel { width: min(760px, 82vw); max-height: 94dvh; }
+  .info-body { grid-template-columns: 1fr 1fr; }
+  .info-log { max-height: 64dvh; }
+  .end-card { max-height: 94dvh; overflow-y: auto; padding: 16px 18px; }
+  .end-title { font-size: 30px; }
+  .heading-grid { gap: 5px; }
+}
+
 </style>
 </head>
 <body>
@@ -2286,11 +2395,21 @@ button { font-family: inherit; }
     if (a.attacked) return { ok: false, error: '本回合已经攻击过' };
     if (a.ap <= 0) return { ok: false, error: '战斗机没有行动力' };
     a.ap -= 1; a.attacked = true;
+    const power = aaPower(t);
+    const lost = applyPlaneDamage(a.planes, power);
+    state.airUnits = state.airUnits.filter(x => x.planes.length > 0);
     const down = a.planes.length;
+    if (!down) {
+      pushLog(state, a.side, '战斗机攻击 ' + unitLabel(t) + '，先承受防空 ' + power + ' 点，' + lost.length +
+        ' 架全灭，未能压制防空。', 'air');
+      return { ok: true, target: t, down: 0, aaDamage: power, lost: lost.length, aa: Math.max(0, t.aa - t.aaDown) };
+    }
     t.aaDown = (t.aaDown || 0) + down;
-    pushLog(state, a.side, '战斗机攻击 ' + unitLabel(t) + '，其防空永久 -' + down + '（当前防空 ' +
+    pushLog(state, a.side, '战斗机攻击 ' + unitLabel(t) + '：先承受防空 ' + power + ' 点，损失 ' + lost.length +
+      ' 架；剩余 ' + down + ' 架压制，其防空永久 -' + down + '（当前防空 ' +
       Math.max(0, t.aa - t.aaDown) + '）。', 'air');
-    return { ok: true, target: t, down, aa: Math.max(0, t.aa - t.aaDown) };
+    return { ok: true, target: t, down, aaDamage: power, lost: lost.length,
+      aa: Math.max(0, t.aa - t.aaDown) };
   }
   function fighterAttackAir(state, uid, targetUid) {
     const a = state.airUnits.find(x => x.uid === uid);
@@ -2501,7 +2620,7 @@ button { font-family: inherit; }
   /* ---------------- 移动 / 转向 / 行动点 ---------------- */
   function canMove(state, u) {
     return !!u && !state.finished && state.phase === 'action' && u.side === state.active &&
-      u.ap > 0 && !u.justDeployed && !u.turned && u.turnProgress === 0 && !u.debuffs.rooted &&
+      u.ap > 0 && !u.justDeployed && u.turnProgress === 0 && !u.debuffs.rooted &&
       !u.firedMain && !u.firedSecondary && !u.firedTorp && !u.firedDepth && !u.firedAA && !u.launched;
   }
   function moveTargets(state, u) {
@@ -3078,19 +3197,18 @@ button { font-family: inherit; }
     if (!target || target.side === state.active || target.cls === 'SS') return { ok: false, error: '目标无效' };
     if (!picks || !picks.length) return { ok: false, error: '没有选择舰载机' };
     const squads = [];
-    const seen = {};
+    const carrierIds = new Set();
     for (const pick of picks) {
       const carrier = getUnit(state, pick.carrierUid);
       if (!carrier || carrier.side !== state.active || carrier.launched || carrier.debuffs.dazed) return { ok: false, error: '有航母本回合不能出击' };
+      if (carrierIds.has(carrier.uid)) return { ok: false, error: '每艘航母只能选择一种飞机' };
+      carrierIds.add(carrier.uid);
       if (cellDist(carrier.r, carrier.c, target.r, target.c) > D.MAX_PATH) return { ok: false, error: carrier.name + ' 超出航程' };
       const g = airGroup(carrier, pick.type);
       if (!g || !g.planes.length) return { ok: false, error: carrier.name + ' 没有该中队' };
-      const key = carrier.uid + ':' + pick.type;
-      if (seen[key]) continue;
-      seen[key] = true;
       squads.push({ carrier, type: pick.type, planes: g.planes.map(p => ({ hp: p.hp, maxHp: p.maxHp, dmgTaken: 0 })) });
     }
-    if (!squads.length) return { ok: false, error: '没有可用机队' };
+    if (squads.length < 2) return { ok: false, error: '联合出击至少需要 2 艘航母，每艘选择一种飞机' };
     const defender = otherSide(state.active);
     const enemyFighters = state.airUnits.filter(a => a.side === defender && a.type === 'F' && a.r === target.r && a.c === target.c);
     const aa = computeCellAA(state, target.r, target.c, defender, target.r, target.c, enemyFighters.length > 0);
@@ -3345,6 +3463,7 @@ button { font-family: inherit; }
     dist, cellDist, inBounds, forward, backRow, otherSide, roundHalfUp
   };
 });
+
 
 
 
@@ -4911,13 +5030,13 @@ button { font-family: inherit; }
       <h2>1 · 回合、补给与行动点</h2>
       <p>每回合开始：补给上限在本轮提高（第 1 轮 <b>1</b>，第 2 轮 2，之后每轮 +1，最高 10），补给<b>回满到上限</b>；然后抽 1 张牌。部署与行动合并：随时在<b>最后线</b>部署舰船、指挥舰船、使用指令，最后结束回合。刚部署的舰船当回合<b>不能移动/转向，但可以开火/出击</b>。每艘舰每回合刷新<b>行动点</b>：驱逐舰 <b>2</b>，其他舰 <b>1</b>；开火和航母出击不消耗行动点。</p>
       <h2>2 · 朝向、移动与转向</h2>
-      <p>每艘舰船有舰首方向（北/东/南/西）。<b>只能朝舰首方向前进</b>，每格消耗 <b>1 行动点</b>；移动不改变舰首。转向：驱逐/巡洋/潜艇消耗 <b>1 AP</b>；战列舰/航母消耗 <b>3 AP</b>，所以通常要跨 3 个回合完成。可以先移动，再用剩余 AP 转向；<b>转向后不能再移动</b>，但可以开火，开火按<b>转向前的炮位</b>结算。转向完成后的下一个回合才按新舰首开火。主炮、副炮按前/后/左/右的炮管数计算伤害。</p>
+      <p>每艘舰船有舰首方向（北/东/南/西）。<b>只能朝舰首方向前进</b>，每格消耗 <b>1 行动点</b>；移动不改变舰首。转向：驱逐/巡洋/潜艇消耗 <b>1 AP</b>；战列舰/航母消耗 <b>3 AP</b>，所以通常要跨 3 个回合完成。移动和转向都消耗 AP，顺序不限：可以先移动再用剩余 AP 转向，也可以转向后继续前进；只有开火后不能再移动/转向。转向当回合开火仍按<b>转向前的炮位</b>结算。转向完成后的下一个回合才按新舰首开火。主炮、副炮按前/后/左/右的炮管数计算伤害。</p>
       <h2>3 · 主炮与副炮</h2>
       <p>主炮和副炮可以<b>分别选择不同目标</b>并同时开火。主炮伤害按可用炮管数 / 最大炮管数折算；副炮射程 2，专门对付驱逐舰等轻型舰船。装甲每层使每次炮击伤害 -1（副炮可被完全挡下）；鱼雷伤害被防鱼雷隔舱每层 -1。</p>
       <h2>4 · 起火与进水</h2>
       <p><b>起火</b>：每层每回合造成 2 点伤害。<b>进水</b>：每层每回合造成 1 点伤害；分左舷/右舷，左右差超过 3 时立即倾覆沉没。主炮/炸弹大伤害会引发起火，鱼雷会在命中侧造成进水。损管指令可以移除。</p>
       <h2>5 · 航空</h2>
-      <p>航母每回合可移动后出击一次；航程 <b>6 格</b>。单航母出击逐格结算防空；多艘航母可以<b>联合出击</b>，不同航母/机型混编，所有机队对同一目标<b>只承受一次防空</b>。战斗机出击后<b>留在战场</b>，每回合刷新 <b>6 行动力</b>，可飞过去攻击敌舰使其防空<b>永久降低</b>，也可与敌机缠斗；敌机经过战斗机所在格会掉血。舰船自身也可用<b>防空炮</b>射击射程 1 内的敌方战斗机（单独「对空」按钮，每舰每回合一次，不影响对海开火）。</p>
+      <p>航母每回合可移动后出击一次；航程 <b>6 格</b>。单航母出击逐格结算防空；多艘航母可以<b>联合出击</b>：每艘航母只能选<b>一种</b>飞机，至少 2 艘；参加联合的航母本回合不能再单独出击，已出击的航母不能参加；所有机队对同一目标<b>只承受一次防空</b>。战斗机出击后<b>留在战场</b>，每回合刷新 <b>6 行动力</b>，可飞过去攻击敌舰：先承受该舰防空，再由存活飞机使其防空<b>永久降低</b>；也可与敌机缠斗；敌机经过战斗机所在格会掉血。舰船自身也可用<b>防空炮</b>射击射程 1 内的敌方战斗机（单独「对空」按钮，每舰每回合一次，不影响对海开火）。</p>
       <h2>6 · 鱼雷、潜艇与深弹</h2>
       <p>水面舰鱼雷分<b>左舷 / 右舷</b>，只能攻击对应侧舷的目标，不能向船头/船尾发射；左右两侧的装填与发射完全独立。驱逐舰等水面舰发射后该侧需要 <b>1 回合装填</b>。<b>潜艇只有舰首鱼雷</b>，目标必须在潜艇舰首方向；发射后暴露并装填 1 回合。敌方 DD/CVE/SS 同线被动发现，DD/CVE 主动搜索、舰队侦察可揭示。<b>驱逐舰深弹伤害 6</b>，潜艇只有 6–7 耐久：两艘驱逐舰一轮就能击沉一艘潜艇。</p>
       <h2>7 · 牌组</h2>
@@ -5111,8 +5230,9 @@ button { font-family: inherit; }
     const rows = carriers.map(u => {
       const groups = (u.air || []).filter(g => g.planes.length);
       if (!groups.length) return '';
+      const opts = groups.map((g, i) => `<option value="${g.type}" ${i === 0 ? 'selected' : ''}>${g.type} ×${g.planes.length}</option>`).join('');
       return `<div class="combined-carrier"><div class="combined-name">${h(u.name)} <span>R${u.r}C${u.c}</span></div>
-        ${groups.map(g => `<label class="combined-group"><input type="checkbox" data-carrier="${u.uid}" data-type="${g.type}" checked> ${g.type} ×${g.planes.length}</label>`).join('')}
+        <select class="combined-type" data-carrier="${u.uid}"><option value="">不参加</option>${opts}</select>
       </div>`;
     }).join('');
     const opts = enemies.map(t => `<option value="${t.uid}">${h(D.NATIONS[t.nation].short)}「${h(t.name)}」 ${t.hp}/${t.maxHp} · R${t.r}C${t.c}</option>`).join('');
@@ -5121,7 +5241,7 @@ button { font-family: inherit; }
     wrap.innerHTML = `<div class="fire-panel combined-panel">
       <div class="end-kicker">COMBINED STRIKE</div>
       <div class="fire-title">联合出击 · 多航母混编</div>
-      <div class="fire-sub">所有选中机队只承受一次目标格防空；不同航母/机型可混合。</div>
+      <div class="fire-sub">每艘航母只能选一种飞机；至少 2 艘。所有选中机队只承受一次目标格防空。参加后本回合不能再次出击；已出击航母不会出现在列表。</div>
       <div class="combined-list">${rows}</div>
       <div class="fire-row"><label>目标</label><select class="combined-target">${opts}</select></div>
       <div class="fire-actions"><button class="act-btn ghost" data-close="1">取消</button><button class="act-btn gold" data-combined="1">出击</button></div>
@@ -5132,9 +5252,10 @@ button { font-family: inherit; }
       if (e.target === wrap || e.target.dataset.close) { closeModal(); return; }
       if (e.target.closest('[data-combined]')) {
         const picks = [];
-        wrap.querySelectorAll('input[data-carrier]:checked').forEach(cb => {
-          picks.push({ carrierUid: parseInt(cb.dataset.carrier, 10), type: cb.dataset.type });
+        wrap.querySelectorAll('select.combined-type').forEach(sel => {
+          if (sel.value) picks.push({ carrierUid: parseInt(sel.dataset.carrier, 10), type: sel.value });
         });
+        if (picks.length < 2) { toast('联合出击至少需要 2 艘航母'); return; }
         const targetUid = parseInt(wrap.querySelector('.combined-target').value, 10);
         if (!picks.length) { toast('至少选择一个机队'); return; }
         closeModal();
@@ -5358,6 +5479,9 @@ button { font-family: inherit; }
     hideTooltip
   };
 })();
+
+
+
 
 
 
